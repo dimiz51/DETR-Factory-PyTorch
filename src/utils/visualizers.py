@@ -4,104 +4,9 @@ import torchvision.transforms as T
 from torch.utils.data import DataLoader
 from torchvision import ops
 import torch
+import os
 
-# COCO Classes
-COCO_CLASSES = [
-    "N/A",
-    "person",
-    "bicycle",
-    "car",
-    "motorcycle",
-    "airplane",
-    "bus",
-    "train",
-    "truck",
-    "boat",
-    "traffic light",
-    "fire hydrant",
-    "N/A",
-    "stop sign",
-    "parking meter",
-    "bench",
-    "bird",
-    "cat",
-    "dog",
-    "horse",
-    "sheep",
-    "cow",
-    "elephant",
-    "bear",
-    "zebra",
-    "giraffe",
-    "N/A",
-    "backpack",
-    "umbrella",
-    "N/A",
-    "N/A",
-    "handbag",
-    "tie",
-    "suitcase",
-    "frisbee",
-    "skis",
-    "snowboard",
-    "sports ball",
-    "kite",
-    "baseball bat",
-    "baseball glove",
-    "skateboard",
-    "surfboard",
-    "tennis racket",
-    "bottle",
-    "N/A",
-    "wine glass",
-    "cup",
-    "fork",
-    "knife",
-    "spoon",
-    "bowl",
-    "banana",
-    "apple",
-    "sandwich",
-    "orange",
-    "broccoli",
-    "carrot",
-    "hot dog",
-    "pizza",
-    "donut",
-    "cake",
-    "chair",
-    "couch",
-    "potted plant",
-    "bed",
-    "N/A",
-    "dining table",
-    "N/A",
-    "N/A",
-    "toilet",
-    "N/A",
-    "tv",
-    "laptop",
-    "mouse",
-    "remote",
-    "keyboard",
-    "cell phone",
-    "microwave",
-    "oven",
-    "toaster",
-    "sink",
-    "refrigerator",
-    "N/A",
-    "book",
-    "clock",
-    "vase",
-    "scissors",
-    "teddy bear",
-    "hair drier",
-    "toothbrush",
-    "empty",
-]
-
-# Colors for visualization
+# Default colors for visualization of boxes
 COLORS = [
     [0.000, 0.447, 0.741],
     [0.850, 0.325, 0.098],
@@ -116,7 +21,12 @@ COLORS *= 100  # Repeat colors to cover all classes
 class DETRBoxVisualizer:
     def __init__(self, class_labels, empty_class_id, normalization_params=(None, None)):
         """
-        Initializes the InferenceVisualizer.
+        The DETR box visualizer is responsible for visualizing the inputs/outputs of the DETR model.
+
+        You can use the public API of the class to:
+        - Visualize a single image with "visualize_image()"
+        - Visualize inferene results from a validation batch with "visualize_validation_inference()"
+        - Visualize a single image with inference results with "visualize_inference()"
 
         Args:
             class_labels (list): List of class labels.
@@ -155,6 +65,8 @@ class DETRBoxVisualizer:
     def _visualize_image(self, im, boxes, probs=None, ax=None):
         """
         Visualizes a single image with bounding boxes and predicted probabilities.
+        NOTE: The boxes tensors is expected to be in the format (xmin, ymin, xmax, ymax) and
+              in pixel space already (not normalized).
 
         Args:
             im (np.array): Image to visualize.
@@ -165,7 +77,7 @@ class DETRBoxVisualizer:
         if ax is None:
             ax = plt.gca()
 
-        # Revert normalization
+        # Revert normalization for image
         im = self._revert_normalization(im).permute(1, 2, 0).cpu().clip(0, 1)
 
         ax.imshow(im)
@@ -212,6 +124,7 @@ class DETRBoxVisualizer:
         """
         if model:
             model = model.eval()
+            model.to(self.device)
         else:
             raise ValueError("No model provided for inference!")
 
@@ -221,7 +134,7 @@ class DETRBoxVisualizer:
         data_loader = DataLoader(
             dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn
         )
-        inputs, (tgt_cl, tgt_bbox) = next(iter(data_loader))
+        inputs, (tgt_cl, tgt_bbox, tgt_mask) = next(iter(data_loader))
 
         # Move inputs to GPU if available and run inference
         inputs = inputs.to(self.device)
@@ -246,6 +159,11 @@ class DETRBoxVisualizer:
             t_cl = tgt_cl[ix]
             o_bbox = out_bbox[ix]
             t_bbox = tgt_bbox[ix]
+            t_mask = tgt_mask[ix].bool()
+
+            # Filter out empty boxes from the ground truths
+            t_cl = t_cl[t_mask]
+            t_bbox = t_bbox[t_mask]
 
             # Apply softmax and rescale boxes
             o_probs = o_cl.softmax(dim=-1)
@@ -268,5 +186,55 @@ class DETRBoxVisualizer:
             # Plot image with ground truth boxes on the right
             self._visualize_image(inputs[ix].cpu(), t_bbox, t_cl, ax=axs[ix, 1])
             axs[ix, 1].set_title("Ground Truth")
+
+        plt.show()
+
+
+def visualize_losses(hist, hist_detail=None, save_dir=None):
+    """
+    Plots training loss over epochs and optionally saves the figure.
+
+    Args:
+        hist (list): List of total loss values per epoch.
+        hist_detail (list, optional): List of tuples (class_loss, bbox_loss, giou_loss) per epoch.
+        save_dir (str, optional): Directory to save the plots. If None, it only displays the plots.
+    """
+
+    # Create save directory if it doesn't exist
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
+
+    epochs = np.arange(1, len(hist) + 1)
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(epochs, hist, label="Total Loss", marker="o", linestyle="-")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.title("Training Loss Over Epochs")
+    plt.legend()
+    plt.grid()
+
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
+        plt.savefig(os.path.join(save_dir, "DETR_training_loss.png"))
+
+    plt.show()
+
+    # If detailed loss is provided, plot them separately
+    if hist_detail:
+        class_loss, bbox_loss, giou_loss = zip(*hist_detail)
+
+        plt.figure(figsize=(10, 5))
+        plt.plot(epochs, class_loss, label="Class Loss", linestyle="--")
+        plt.plot(epochs, bbox_loss, label="BBox Loss", linestyle="--")
+        plt.plot(epochs, giou_loss, label="GIoU Loss", linestyle="--")
+        plt.xlabel("Epochs")
+        plt.ylabel("Loss")
+        plt.title("Detailed Training Loss Over Epochs")
+        plt.legend()
+        plt.grid()
+
+        if save_dir:
+            plt.savefig(os.path.join(save_dir, "DETR_training_losses.png"))
 
         plt.show()
