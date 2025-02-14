@@ -13,18 +13,24 @@ import torch
 import torchvision.ops as ops
 
 
-# Shapes
-# o_bbox shape: torch.Size([100, 4])
-# t_bbox shape: torch.Size([100, 4])
-# o_cl shape: torch.Size([100, 2])
-# t_cl shape: torch.Size([100])
-# t_mask shape: torch.Size([4, 100])
-
-
-def compute_batch_loss(
+def compute_sample_loss(
     o_bbox, t_bbox, o_cl, t_cl, t_mask, n_queries=100, empty_class_id=91, device="cuda"
 ):
-    """Compute a loss for a batch of predictions and targets."""
+    """Compute a the DETR loss for a single sample
+
+    Args:
+        o_bbox (torch.Tensor): The predicted bounding boxes (Shape: torch.Size([100, 4]))
+        t_bbox (torch.Tensor): The ground truth bounding boxes (Shape: torch.Size([100, 4]))
+        o_cl (torch.Tensor): The predicted class labels (Shape: torch.Size([100, num_classes]))
+        t_cl (torch.Tensor): The ground truth class labels (Shape: torch.Size([100]))
+        t_mask (torch.Tensor): The mask for the ground truth bounding boxes (Shape: torch.Size([100]))
+        n_queries (int, optional): The number of object queries. Defaults to 100.
+        empty_class_id (int, optional): The class ID representing 'no object'. Defaults to 91.
+
+    Returns:
+        tuple: Tuple of (loss_class, loss_bbox, loss_giou)
+
+    """
 
     # Filter out the padded classes/boxes using the boolean mask
     valid_gt_boxes = t_bbox[t_mask]
@@ -72,12 +78,12 @@ def compute_batch_loss(
     # the pairs are {(o_ixs[0], t[0]), {o_ixs[1], t[1]}, ...}
     o_ixs = o_ixs[t_ixs.argsort()]
 
-    # Average over the number of boxes, not the number of coordinates...
-    num_boxes = len(t_bbox)
+    # Average over the number of boxes
+    num_boxes = len(valid_gt_boxes)
 
     # Compute the L1 loss for the boxes..
 
-    loss_bbox = F.l1_loss(o_bbox[o_ixs], valid_gt_boxes, reduce="sum") / num_boxes
+    loss_bbox = F.l1_loss(o_bbox[o_ixs], valid_gt_boxes, reduction="sum") / num_boxes
 
     # Get the GIoU matrix
     target_gIoU = ops.generalized_box_iou(
