@@ -4,7 +4,7 @@ import torchvision.transforms as T
 from torch.utils.data import DataLoader
 from torchvision import ops
 import torch
-import os
+from utils.inference import class_based_nms
 
 # Default colors for visualization of boxes
 COLORS = [
@@ -63,7 +63,7 @@ class DETRBoxVisualizer:
         """
         return self.unnormalize(tensor)
 
-    def _visualize_image(self, im, boxes, probs=None, ax=None):
+    def _visualize_image(self, im, boxes, class_ids, scores=None, ax=None):
         """
         Visualizes a single image with bounding boxes and predicted probabilities.
         NOTE: The boxes tensors is expected to be in the format (xmin, ymin, xmax, ymax) and
@@ -72,7 +72,8 @@ class DETRBoxVisualizer:
         Args:
             im (np.array): Image to visualize.
             boxes (np.array): Bounding boxes.
-            probs (np.array, optional): Probabilities for each box.
+            class_ids (np.array): Class IDs for each box.
+            scores (np.array, optional): Probabilities for each box.
             ax (matplotlib.axes.Axes, optional): Matplotlib axis object.
         """
         if ax is None:
@@ -87,23 +88,27 @@ class DETRBoxVisualizer:
         for i, b in enumerate(boxes.tolist()):
             xmin, ymin, xmax, ymax = b
 
-            if probs is not None:
-                if probs.ndim == 1:
-                    cl = probs[i].item()
-                else:
-                    cl = probs[i].argmax().item()
+            if scores is not None:
+                score = scores[i]
+            else:
+                score = None
 
-                # Assign a color to the class if not already assigned
-                if cl not in self.class_to_color:
-                    self.class_to_color[cl] = COLORS[cl % len(COLORS)]
+            if class_ids is not None:
+                cl = class_ids[i]
+            else:
+                raise ValueError("No class IDs provided for visualization!")
 
-                color = self.class_to_color[cl]
+            # Assign a color to the class if not already assigned
+            if cl not in self.class_to_color:
+                self.class_to_color[cl] = COLORS[cl % len(COLORS)]
 
-                text = (
-                    f"{self.class_labels[cl]}"
-                    if probs.ndim == 1
-                    else f"{self.class_labels[cl]}: {probs[i, cl]:0.2f}"
-                )
+            color = self.class_to_color[cl]
+
+            text = (
+                f"{self.class_labels[cl]}"
+                if score is None
+                else f"{self.class_labels[cl]}: {score:0.2f}"
+            )
 
             # Draw bounding box
             patch = plt.Rectangle(
@@ -122,7 +127,13 @@ class DETRBoxVisualizer:
             )
 
     def visualize_validation_inference(
-        self, model, dataset, batch_size=2, collate_fn=None, image_size=480
+        self,
+        model,
+        dataset,
+        batch_size=2,
+        collate_fn=None,
+        image_size=480,
+        nms_threshold=0.3,
     ):
         """
         Performs inference on the validation dataset and visualizes predictions.
@@ -133,6 +144,7 @@ class DETRBoxVisualizer:
             batch_size (int, optional): Batch size for DataLoader. Defaults to 2.
             collate_fn(fn, optional): Collate function to create a dataloader from the dataset
             image_size(int, optional): The image size of the images in the dataset (Default: 480)
+            nms_threshold(float, optional): The threshold for NMS (Default: 0.5)
         """
         if model:
             model = model.eval()
@@ -189,9 +201,21 @@ class DETRBoxVisualizer:
             # Filter "no object" predictions
             o_keep = o_probs.argmax(-1) != self.empty_class_id
 
+            keep_boxes = o_bbox[o_keep]
+            keep_probs = o_probs[o_keep]
+
+            # Apply class-based NMS
+            nms_boxes, nms_probs, nms_classes = class_based_nms(
+                keep_boxes, keep_probs, nms_threshold
+            )
+            num_filtered = nms_boxes.shape[0] - keep_boxes.shape[0]
+
+            if nms_boxes.shape[0] > 0 and num_filtered > 0:
+                print(f"Filtered out {num_filtered} boxes with NMS...")
+
             # Plot image with predictions on the left
             self._visualize_image(
-                inputs[ix].cpu(), o_bbox[o_keep], o_probs[o_keep], ax=axs[ix, 0]
+                inputs[ix].cpu(), nms_boxes, nms_classes, nms_probs, ax=axs[ix, 0]
             )
             axs[ix, 0].set_title("Predictions")
 
