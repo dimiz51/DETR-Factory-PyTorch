@@ -26,7 +26,7 @@ class DETRBoxVisualizer:
         You can use the public API of the class to:
         - Visualize a single image with "visualize_image()"
         - Visualize inferene results from a validation batch with "visualize_validation_inference()"
-        - Visualize a single image with inference results with "visualize_inference()"
+        - Visualize inference results over a single image with "visualize_inference()" TODO
 
         Args:
             class_labels (list): List of class labels.
@@ -35,6 +35,7 @@ class DETRBoxVisualizer:
         """
         self.class_labels = class_labels
         self.empty_class_id = empty_class_id
+        self.class_to_color = {}
 
         if normalization_params != (None, None):
             self.normalization_params = normalization_params
@@ -85,29 +86,40 @@ class DETRBoxVisualizer:
 
         for i, b in enumerate(boxes.tolist()):
             xmin, ymin, xmax, ymax = b
+
+            if probs is not None:
+                if probs.ndim == 1:
+                    cl = probs[i].item()
+                else:
+                    cl = probs[i].argmax().item()
+
+                # Assign a color to the class if not already assigned
+                if cl not in self.class_to_color:
+                    self.class_to_color[cl] = COLORS[cl % len(COLORS)]
+
+                color = self.class_to_color[cl]
+
+                text = (
+                    f"{self.class_labels[cl]}"
+                    if probs.ndim == 1
+                    else f"{self.class_labels[cl]}: {probs[i, cl]:0.2f}"
+                )
+
+            # Draw bounding box
             patch = plt.Rectangle(
                 (xmin, ymin),
                 xmax - xmin,
                 ymax - ymin,
                 fill=False,
-                color=COLORS[i],
+                color=color,
                 linewidth=2,
             )
             ax.add_patch(patch)
-            if probs is not None:
-                if probs.ndim == 1:
-                    cl = probs[i].item()
-                    text = f"{self.class_labels[cl]}"
-                else:
-                    cl = probs[i].argmax().item()
-                    text = f"{self.class_labels[cl]}: {probs[i, cl]:0.2f}"
-                ax.text(
-                    xmin,
-                    ymin,
-                    text,
-                    fontsize=7,
-                    bbox=dict(facecolor="yellow", alpha=0.5),
-                )
+
+            # Add label text
+            ax.text(
+                xmin, ymin, text, fontsize=7, bbox=dict(facecolor="yellow", alpha=0.5)
+            )
 
     def visualize_validation_inference(
         self, model, dataset, batch_size=2, collate_fn=None, image_size=480
@@ -186,55 +198,5 @@ class DETRBoxVisualizer:
             # Plot image with ground truth boxes on the right
             self._visualize_image(inputs[ix].cpu(), t_bbox, t_cl, ax=axs[ix, 1])
             axs[ix, 1].set_title("Ground Truth")
-
-        plt.show()
-
-
-def visualize_losses(hist, hist_detail=None, save_dir=None):
-    """
-    Plots training loss over epochs and optionally saves the figure.
-
-    Args:
-        hist (list): List of total loss values per epoch.
-        hist_detail (list, optional): List of tuples (class_loss, bbox_loss, giou_loss) per epoch.
-        save_dir (str, optional): Directory to save the plots. If None, it only displays the plots.
-    """
-
-    # Create save directory if it doesn't exist
-    if save_dir:
-        os.makedirs(save_dir, exist_ok=True)
-
-    epochs = np.arange(1, len(hist) + 1)
-
-    plt.figure(figsize=(10, 5))
-    plt.plot(epochs, hist, label="Total Loss", marker="o", linestyle="-")
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.title("Training Loss Over Epochs")
-    plt.legend()
-    plt.grid()
-
-    if save_dir:
-        os.makedirs(save_dir, exist_ok=True)
-        plt.savefig(os.path.join(save_dir, "DETR_training_loss.png"))
-
-    plt.show()
-
-    # If detailed loss is provided, plot them separately
-    if hist_detail:
-        class_loss, bbox_loss, giou_loss = zip(*hist_detail)
-
-        plt.figure(figsize=(10, 5))
-        plt.plot(epochs, class_loss, label="Class Loss", linestyle="--")
-        plt.plot(epochs, bbox_loss, label="BBox Loss", linestyle="--")
-        plt.plot(epochs, giou_loss, label="GIoU Loss", linestyle="--")
-        plt.xlabel("Epochs")
-        plt.ylabel("Loss")
-        plt.title("Detailed Training Loss Over Epochs")
-        plt.legend()
-        plt.grid()
-
-        if save_dir:
-            plt.savefig(os.path.join(save_dir, "DETR_training_losses.png"))
 
         plt.show()
