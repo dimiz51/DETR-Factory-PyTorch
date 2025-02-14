@@ -1,9 +1,9 @@
-# Building and training a DETR (Detection Transformer) mode with PyTorch
+# Building and training a DETR (Detection Transformer) model with PyTorch
 This project is an implementation of the Detection Transformer(DETR) for state-of-the-art object detection using the well-known Transformer architecture. This project makes training, fine-tuning and evaluation of the DETR model simple and straightforward on your own dataset.
 
 
 ## Training the model
-As transformers typically require a **significant amount of time** especially when trained from scratch it is highly recommended to fine-tune the model instead and start the training using pre-trained weights for all the heads. For the experiment conducted in the [DETR notebook](./src/detr.ipynb) **I have used pre-trained weights from a previous training with the COCO dataset(~150 epochs on the complete COCO)and fine-tuned the model with the Chess Pieces dataset for another 100 epochs**.
+As transformers typically require a **significant amount of time** especially when trained from scratch it is highly recommended to fine-tune the model instead and start the training using pre-trained weights for all the heads. For the experiment conducted in the [DETR notebook](./src/detr.ipynb) **I have used pre-trained weights from a previous training with the COCO dataset (~150 epochs on the complete COCO) and fine-tuned the model with the Chess Pieces dataset for another 100 epochs**.
 
 The total loss (weight sum of the GIoU, L1 bounding box loss and classification loss) as well as the separate losses from training time can be seen below:
 
