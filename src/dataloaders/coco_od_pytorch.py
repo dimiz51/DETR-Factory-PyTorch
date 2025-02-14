@@ -83,7 +83,10 @@ def preproc_coco(
         im_h (int): Height of the image
 
     Returns:
-        tuple: Tuple of (classes, boxes)
+        tuple: (classes, boxes, mask)
+            - classes (torch.Tensor): (max_boxes,)
+            - boxes (torch.Tensor): (max_boxes, 4)
+            - mask (torch.Tensor): (max_boxes,)
     """
     anno = [obj for obj in annotation if "iscrowd" not in obj or obj["iscrowd"] == 0]
 
@@ -128,11 +131,15 @@ class TorchCOCOLoader(datasets.CocoDetection):
     """ "
     Loader for COCO dataset using Pytorch's CocoDetection
 
+    NOTE: The ground truths are padded to a fixed shape according to "max_boxes" to
+          ensure that all samples have the same size (necessary to not use tuple and
+          use torch tensors instead).
+
     Docs:
     - https://pytorch.org/vision/main/generated/torchvision.datasets.CocoDetection.html
 
     Returns:
-        tuple: Tuple of (image, (classes, boxes)) for each item
+        tuple: Tuple of (image, (classes, boxes, padding_mask)) for each objects
     """
 
     def __init__(
@@ -177,18 +184,38 @@ class TorchCOCOLoader(datasets.CocoDetection):
     def __getitem__(self, idx):
         img, target = super().__getitem__(idx)
         w, h = img.size
+        image_id = torch.as_tensor([idx], dtype=torch.int64)
 
         input_ = self.T(img)
         classes, boxes, padding_mask = self.T_target(
             target, w, h, max_boxes=self.max_boxes, empty_class_id=self.empty_class_id
         )
 
-        return input_, (classes, boxes, padding_mask)
+        return input_, (classes, boxes, padding_mask, image_id)
 
 
 def collate_fn(inputs):
+    """
+    Collate function for the PyTorch DataLoader.
+
+    Takes a list of items, where each item is a tuple of:
+        - input_ (torch.Tensor): The input image tensor.
+        - target (tuple): A tuple of (classes, boxes, masks) where:
+            - classes (torch.Tensor): The class labels for each object.
+            - boxes (torch.Tensor): The bounding boxes for each object.
+            - masks (torch.Tensor): The masks for each object.
+
+    Returns:
+        tuple: A tuple of (input_, target) where:
+            - input_ (torch.Tensor): The batched input image tensor.
+            - target (tuple): A tuple of (classes, boxes, masks) where:
+                - classes (torch.Tensor): The batched class labels for each object.
+                - boxes (torch.Tensor): The batched bounding boxes for each object.
+                - masks (torch.Tensor): The batched masks for each object.
+    """
     input_ = torch.stack([i[0] for i in inputs])
     classes = torch.stack([i[1][0] for i in inputs])
     boxes = torch.stack([i[1][1] for i in inputs])
     masks = torch.stack([i[1][2].to(dtype=torch.long) for i in inputs])
-    return input_, (classes, boxes, masks)
+    image_ids = torch.stack([i[1][3] for i in inputs])
+    return input_, (classes, boxes, masks, image_ids)

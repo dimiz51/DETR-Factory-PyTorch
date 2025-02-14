@@ -23,7 +23,7 @@ def compute_sample_loss(
         t_bbox (torch.Tensor): The ground truth bounding boxes (Shape: torch.Size([100, 4]))
         o_cl (torch.Tensor): The predicted class labels (Shape: torch.Size([100, num_classes]))
         t_cl (torch.Tensor): The ground truth class labels (Shape: torch.Size([100]))
-        t_mask (torch.Tensor): The mask for the ground truth bounding boxes (Shape: torch.Size([100]))
+        t_mask (torch.Tensor): The mask(boolean) for the ground truth bounding boxes (Shape: torch.Size([100]))
         n_queries (int, optional): The number of object queries. Defaults to 100.
         empty_class_id (int, optional): The class ID representing 'no object'. Defaults to 91.
 

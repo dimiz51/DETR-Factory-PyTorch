@@ -23,7 +23,7 @@ def get_hook(outs, name):
 
 
 class DETR(nn.Module):
-    """Detection Transformer (DETR) model build from scratch
+    """Detection Transformer (DETR) model with a ResNet50 backbone.
 
     Paper: https://arxiv.org/abs/2005.12872
 
