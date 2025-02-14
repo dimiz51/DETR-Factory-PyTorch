@@ -158,6 +158,29 @@ class DETRTrainer:
                 f"{self.checkpoint_dir}/model_epoch{epoch+1}.pt",
             )
 
+    def load_loss_history(self, hist_file=None, detail_hist_file=None):
+        """
+        Loads training loss and detailed loss history from .npy files and updates the corresponding attributes.
+
+        Args:
+            hist_file (str, optional): Path to the .npy file containing the total loss history.
+            detail_hist_file (str, optional): Path to the .npy file containing detailed loss history
+                                            (class loss, bbox loss, GIoU loss).
+        """
+        if hist_file:
+            try:
+                self.hist = np.load(hist_file).tolist()
+                print(f"Loaded loss history from {hist_file}.")
+            except Exception as e:
+                print(f"Error loading loss history file: {e}")
+
+        if detail_hist_file:
+            try:
+                self.hist_detailed_losses = np.load(detail_hist_file).tolist()
+                print(f"Loaded detailed loss history from {detail_hist_file}.")
+            except Exception as e:
+                print(f"Error loading detailed loss history file: {e}")
+
     def visualize_losses(self, save_dir=None):
         """
         Plots training loss over epochs and optionally saves the figure.
@@ -170,7 +193,7 @@ class DETRTrainer:
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
 
-        epochs = np.arange(1, len(self.hist) + 1)
+        epochs = np.arange(1, len(self.hist) + 1) * self.log_freq
 
         plt.figure(figsize=(10, 5))
         plt.plot(epochs, self.hist, label="Total Loss", marker="o", linestyle="-")
@@ -199,9 +222,7 @@ class DETRTrainer:
             plt.grid()
 
             if save_dir:
-                plt.savefig(
-                    os.path.join(self.hist_detailed_losses, "DETR_training_losses.png")
-                )
+                plt.savefig(os.path.join(save_dir, "DETR_training_losses.png"))
             plt.show()
 
     def train(self):
@@ -222,7 +243,7 @@ class DETRTrainer:
         self.hist_detailed_losses = []
 
         for epoch in range(self.epochs):
-            for batch_idx, (input_, (tgt_cl, tgt_bbox, tgt_mask)) in enumerate(
+            for batch_idx, (input_, (tgt_cl, tgt_bbox, tgt_mask, _)) in enumerate(
                 self.train_loader
             ):
                 # Move data to device
@@ -260,8 +281,6 @@ class DETRTrainer:
                         loss_class_batch += loss_class / self.batch_size / len(outs)
                         loss_bbox_batch += loss_bbox / self.batch_size / len(outs)
                         loss_giou_batch += loss_giou / self.batch_size / len(outs)
-                        break
-                    break
 
                 self.optimizer.zero_grad(set_to_none=True)
                 loss.backward()

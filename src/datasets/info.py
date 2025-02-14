@@ -1,6 +1,5 @@
 # This module file contains information about each dataset used in this experiment with DETR.
 
-COCO_CLASSES = # COCO Classes
 COCO_CLASSES = [
     "N/A",
     "person",
@@ -97,13 +96,15 @@ COCO_CLASSES = [
 ]
 
 
-#--------------------------------------------------------
+# --------------------------------------------------------
 
-
-# Import this to get access to the dataset classes
-DATASET_CLASSES={
-    "coco" : {
-        "class_names" : COCO_CLASSES,
-        "empty_class_id": 91
+DATASET_CLASSES = {
+    "coco": {
+        "class_names": COCO_CLASSES,
+        "empty_class_id": 91,
+        "links": {
+            "images": "http://images.cocodataset.org/zips/train2017.zip",
+            "annotations": "http://images.cocodataset.org/annotations/annotations_trainval2017.zip",
+        },
     }
 }

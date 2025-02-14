@@ -158,7 +158,7 @@ class DETRBoxVisualizer:
         data_loader = DataLoader(
             dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn
         )
-        inputs, (tgt_cl, tgt_bbox, tgt_mask) = next(iter(data_loader))
+        inputs, (tgt_cl, tgt_bbox, tgt_mask, _) = next(iter(data_loader))
 
         # Move inputs to GPU if available and run inference
         inputs = inputs.to(self.device)
