@@ -24,10 +24,8 @@ class DETRBoxVisualizer:
         The DETR box visualizer is responsible for visualizing the inputs/outputs of the DETR model.
 
         You can use the public API of the class to:
-        - Visualize a single image with "visualize_image()"
-        - Visualize inferene results from a validation batch with "visualize_validation_inference()"
-        - Visualize inference results over a single image with "visualize_inference()" TODO
-
+        - Visualize a single image or inference results with "visualize_image()"
+        - Visualize batch inference results using a validation dataset with "visualize_validation_inference()"
         Args:
             class_labels (list): List of class labels.
             normalization_params (tuple): Mean and standard deviation used for normalization.
@@ -37,7 +35,15 @@ class DETRBoxVisualizer:
         self.empty_class_id = empty_class_id
         self.class_to_color = {}
 
-        if normalization_params != (None, None):
+        if normalization_params != (None, None) and type(normalization_params) == tuple:
+            if len(normalization_params) != 2:
+                raise ValueError(
+                    "Expected normalization_params to be a tuple of length 2!"
+                )
+
+            mean, std = normalization_params
+            if len(mean) != 3 or len(std) != 3:
+                raise ValueError("Expected mean and std to be tuples of length 3!")
             self.normalization_params = normalization_params
         else:
             # Assume ImageNet normalization
