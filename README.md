@@ -32,7 +32,7 @@ Detection Transformer (DETR) is an object detection model developed by **Meta AI
 This end-to-end object detection model combines a convolutional backbone (such as ResNet) for feature extraction with a Transformer encoder-decoder architecture. The Transformer processes image features as a sequence of embeddings, capturing global relationships across the image. Instead of traditional region proposals, DETR uses a set-based prediction approach with learnable object queries and bipartite matching loss (Hungarian algorithm) to directly predict object bounding boxes and class labels, making it simpler and more efficient than conventional detectors like Faster R-CNN.
 
 ### The training objective
-In order to train DETR the authors of the [original paper](https://arxiv.org/abs/2005.12872) developed a comprenensive but relatively simple loss function to optimize the models parameters during training. The loss function is defined as:
+In order to train DETR, the authors of the [original paper](https://arxiv.org/abs/2005.12872) developed a comprenensive but relatively simple loss function to optimize the models parameters during training. The loss function is defined as:
 
 - **DETR Loss** = λ_cls * L_cls + λ_bbox * L_bbox + λ_giou * L_giou
 
