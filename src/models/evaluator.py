@@ -57,13 +57,6 @@ class DETREvaluator:
 
         with torch.no_grad():
             for ix, (input_, (_, _, _, image_ids)) in enumerate(self.dataloader):
-                # # Load the image size from the coco annotation
-                # img_size = (self.coco_gt.imgs[img_idx[0].item()]["width"], self.coco_gt.imgs[img_idx[0].item()]["height"])
-                # # If widht/height are not the same, throw an error...
-                # # Evaluation for not square images is not supported yet...
-                # if img_size[0] != img_size[1]:
-                #     raise ValueError("Evaluation for not square images is not supported yet...")
-
                 # Move inputs to device
                 input_ = input_.to(self.device)
                 outputs = self.model(input_)
@@ -82,18 +75,20 @@ class DETREvaluator:
                     img_id = image_ids[img_idx].item()
 
                     # Get ground truth image size for rescaling...
-                    gt_image_size = (
-                        self.coco_gt.imgs[img_id]["width"],
-                        self.coco_gt.imgs[img_id]["height"],
+                    scale_factors = torch.tensor(
+                        [
+                            self.coco_gt.imgs[img_id]["width"],
+                            self.coco_gt.imgs[img_id]["height"],
+                            self.coco_gt.imgs[img_id]["width"],
+                            self.coco_gt.imgs[img_id]["height"],
+                        ],
+                        dtype=torch.float32,
                     )
-                    if gt_image_size[0] != gt_image_size[1]:
-                        raise ValueError(
-                            "Evaluation for non square images is not supported yet..."
-                        )
 
-                    # Convert bounding boxes to COCO format()
-                    o_bbox = ops.box_convert(
-                        o_bbox * gt_image_size[0], in_fmt="cxcywh", out_fmt="xywh"
+                    # Convert bounding boxes to COCO format() and scale to image size
+                    o_bbox = (
+                        ops.box_convert(o_bbox, in_fmt="cxcywh", out_fmt="xywh")
+                        * scale_factors
                     )
 
                     # Filter out "no object" predictions
