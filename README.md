@@ -136,7 +136,7 @@ Recall improves with more detections (AR=0.080 for maxDets=1, rising to 0.317 fo
 
 ## Train, fine-tune or evaluate your own DETR model for object detection
 
-Training a DETR model for object detection is made as simple as possible with this project, using the [DETR notebook](./src/detr.ipynb) and any dataset under the [COCO format](https://docs.aws.amazon.com/rekognition/latest/customlabels-dg/md-coco-overview.html). As mentioned in the [Case study](#case-study-fine-tuning-and-evaluating-detr-on-a-small-dataset) you can either start a training from scratch or use whichever of the provided [pre-trained weights](#pre-trained-weights-for-detr) suits your task better.
+Training a DETR model for object detection is made as simple as possible with this project, using the [DETR notebook](./src/detr.ipynb) and any dataset under the [COCO format](https://docs.aws.amazon.com/rekognition/latest/customlabels-dg/md-coco-overview.html). As mentioned previously in the [Case study](#case-study-fine-tuning-and-evaluating-detr-on-a-small-dataset), you can either start a training from scratch or use whichever of the provided [pre-trained weights](#pre-trained-weights-for-detr) suits your task better.
 
 
 ### Pre-trained weights for DETR
