@@ -73,8 +73,14 @@ class DETRTrainer:
         backbone_params = [p for n, p in model.named_parameters() if "backbone." in n]
 
         if freeze_backbone:
+            print("Freezing CNN backbone...")
             for p in model.backbone.parameters():
                 p.requires_grad = False
+            else:
+                # This is needed to re-enable the training of the backbone in case a previous
+                # training iteration kept it frozen...
+                for p in model.backbone.parameters():
+                    p.requires_grad = True
         print(f"CNN backbone is trainable: {not freeze_backbone}")
 
         transformer_params = [

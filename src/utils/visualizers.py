@@ -4,7 +4,12 @@ import torchvision.transforms as T
 from torch.utils.data import DataLoader
 from torchvision import ops
 import torch
-from utils.inference import class_based_nms
+from utils.inference import class_based_nms, run_inference
+import cv2
+from PIL import Image
+from torchvision.transforms.functional import to_tensor, to_pil_image
+from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+import os
 
 # Default colors for visualization of boxes
 COLORS = [
@@ -152,12 +157,6 @@ class DETRBoxVisualizer:
             image_size(int, optional): The image size of the images in the dataset (Default: 480)
             nms_threshold(float, optional): The threshold for NMS (Default: 0.5)
         """
-        if model:
-            model = model.eval()
-            model.to(self.device)
-        else:
-            raise ValueError("No model provided for inference!")
-
         if dataset is None:
             raise ValueError("No validation dataset provided for inference!")
 
@@ -167,15 +166,10 @@ class DETRBoxVisualizer:
         inputs, (tgt_cl, tgt_bbox, tgt_mask, _) = next(iter(data_loader))
 
         # Move inputs to GPU if available and run inference
-        inputs = inputs.to(self.device)
-        with torch.no_grad():
-            outputs = model(inputs)
         print(f"Running inference on device: {self.device}")
-
-        # Assuming 'layer_5' contains the desired outputs
-        out_cl, out_bbox = outputs["layer_5"].values()
-        out_bbox = out_bbox.sigmoid().cpu()
-        out_cl = out_cl.cpu()
+        inference_results = run_inference(
+            model, self.device, inputs, nms_threshold, image_size, self.empty_class_id
+        )
 
         fig, axs = plt.subplots(
             batch_size, 2, figsize=(15, 7.5 * batch_size), constrained_layout=True
@@ -185,48 +179,158 @@ class DETRBoxVisualizer:
 
         for ix in range(batch_size):
             # Get true and predicted boxes for the batch
-            o_cl = out_cl[ix]
             t_cl = tgt_cl[ix]
-            o_bbox = out_bbox[ix]
             t_bbox = tgt_bbox[ix]
             t_mask = tgt_mask[ix].bool()
 
-            # Filter out empty boxes from the ground truths
+            # Filter out empty ground truth boxes
             t_cl = t_cl[t_mask]
             t_bbox = t_bbox[t_mask]
 
-            # Apply softmax and rescale boxes
-            o_probs = o_cl.softmax(dim=-1)
-            o_bbox = ops.box_convert(
-                o_bbox * image_size, in_fmt="cxcywh", out_fmt="xyxy"
-            )
+            # Convert to xyxy format
             t_bbox = ops.box_convert(
                 t_bbox * image_size, in_fmt="cxcywh", out_fmt="xyxy"
             )
 
-            # Filter "no object" predictions
-            o_keep = o_probs.argmax(-1) != self.empty_class_id
+            # Extract inference results
+            nms_boxes, nms_probs, nms_classes = inference_results[ix]
 
-            keep_boxes = o_bbox[o_keep]
-            keep_probs = o_probs[o_keep]
-
-            # Apply class-based NMS
-            nms_boxes, nms_probs, nms_classes = class_based_nms(
-                keep_boxes, keep_probs, nms_threshold
-            )
-            num_filtered = nms_boxes.shape[0] - keep_boxes.shape[0]
-
-            if nms_boxes.shape[0] > 0 and num_filtered > 0:
-                print(f"Filtered out {num_filtered} boxes with NMS...")
-
-            # Plot image with predictions on the left
+            # Plot predictions
             self._visualize_image(
                 inputs[ix].cpu(), nms_boxes, nms_classes, nms_probs, ax=axs[ix, 0]
             )
             axs[ix, 0].set_title("Predictions")
 
-            # Plot image with ground truth boxes on the right
+            # Plot ground truth
             self._visualize_image(inputs[ix].cpu(), t_bbox, t_cl, ax=axs[ix, 1])
             axs[ix, 1].set_title("Ground Truth")
 
         plt.show()
+
+    def visualize_video_inference(
+        self,
+        model,
+        video_path,
+        save_dir,
+        image_size=480,
+        batch_size=5,
+        nms_threshold=0.3,
+    ):
+        """
+        Processes a video, runs inference in batches of frames, visualizes results, and saves a new video.
+
+        Args:
+            model (torch.nn.Module): The trained model for inference.
+            video_path (str): Path to the input video.
+            save_dir (str): Directory to save the processed video.
+            image_size (int, optional): Image size for transformations. Default is 480.
+            batch_size (int, optional): Number of frames per inference batch. Default is 5.
+            nms_threshold (float, optional): NMS threshold for removing overlapping boxes. Default is 0.3.
+        """
+        # Open video
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise ValueError(f"Cannot open video: {video_path}")
+
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        print(f"Total frames in video: {total_frames}")
+
+        original_fps = int(cap.get(cv2.CAP_PROP_FPS))
+        print(f"Video FPS: {original_fps}")
+
+        transform = T.Compose(
+            [
+                T.Resize((image_size, image_size), antialias=True),
+                T.ToTensor(),
+                T.Normalize(
+                    mean=self.normalization_params[0], std=self.normalization_params[1]
+                ),
+            ]
+        )
+
+        frames = []
+        frame_batches = []
+        processed_frames = []
+
+        print(f"Running inference on device: {self.device}")
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break  # End of video
+
+            # Convert OpenCV frame (BGR) to PIL Image (RGB)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            pil_img = Image.fromarray(frame)
+
+            # Apply transformations and add batch dimension
+            img_tensor = transform(pil_img).unsqueeze(0)
+
+            # Get the original image size
+            video_h, video_w, _ = frame.shape
+
+            # Resize original frame to match image size...
+            frames.append(frame)
+            frame_batches.append(img_tensor)
+
+            # Process batch when we have enough frames
+            if len(frame_batches) == batch_size:
+                # Build batch for batch inference...
+                batch_input = torch.cat(frame_batches, dim=0)
+
+                # Run inference using the specified device...
+                inference_results = run_inference(
+                    model,
+                    self.device,
+                    batch_input,
+                    nms_threshold,
+                    image_size,
+                    self.empty_class_id,
+                )
+
+                for i in range(batch_size):
+                    nms_boxes, nms_probs, nms_classes = inference_results[i]
+                    # If there are no boxes just add the original frame and continue...
+                    if nms_boxes.size == 0:
+                        processed_frames.append(frames[i])
+                        continue
+
+                    # Visualize detections
+                    fig, ax = plt.subplots(
+                        figsize=(image_size / 100, image_size / 100), dpi=100
+                    )
+                    ax.set_frame_on(False)
+                    ax.set_axis_off()
+                    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+                    self._visualize_image(
+                        batch_input[i].cpu(), nms_boxes, nms_classes, nms_probs, ax=ax
+                    )
+
+                    # Convert plot to frame
+                    fig.canvas.draw()
+                    plotted_frame = np.array(fig.canvas.renderer.buffer_rgba())[
+                        :, :, :3
+                    ]
+                    plotted_frame = cv2.resize(
+                        plotted_frame,
+                        (video_w, video_h),
+                        interpolation=cv2.INTER_LINEAR,
+                    )
+                    processed_frames.append(plotted_frame)
+
+                    plt.close(fig)
+
+                # Clear batch
+                frames, frame_batches = [], []
+
+        cap.release()
+
+        if len(processed_frames) < batch_size:
+            print(f"Skipped last batch as it contains less than {batch_size} frames.")
+
+        # Save processed video
+        output_video_path = os.path.join(save_dir, "processed_video.mp4")
+        os.makedirs(save_dir, exist_ok=True)
+        clip = ImageSequenceClip(processed_frames, fps=original_fps)
+        clip.write_videofile(output_video_path, codec="libx264")
+        print(f"Saved processed video to: {output_video_path}")
