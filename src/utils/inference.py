@@ -34,7 +34,14 @@ def class_based_nms(boxes, probs, iou_threshold=0.5):
 
 
 def run_inference(
-    model, device, inputs, nms_threshold=0.3, image_size=480, empty_class_id=0, out_format = "xyxy", scale_boxes = True
+    model,
+    device,
+    inputs,
+    nms_threshold=0.3,
+    image_size=480,
+    empty_class_id=0,
+    out_format="xyxy",
+    scale_boxes=True,
 ):
     """
     Utility function that wraps the inference and post-processing and returns the results for the
@@ -74,9 +81,7 @@ def run_inference(
     for i in range(inputs.shape[0]):
         o_bbox = out_bbox[i]
         o_cl = out_cl_probs[i].softmax(dim=-1)
-        o_bbox = (
-            ops.box_convert(o_bbox, in_fmt="cxcywh", out_fmt=out_format)
-        )
+        o_bbox = ops.box_convert(o_bbox, in_fmt="cxcywh", out_fmt=out_format)
 
         # Scale boxes if needed...
         if scale_boxes:

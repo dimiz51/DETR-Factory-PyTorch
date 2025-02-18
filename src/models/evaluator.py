@@ -15,7 +15,7 @@ class DETREvaluator:
         empty_class_id: int,
         collate_fn: callable,
         nms_iou_threshold: float = 0.5,
-        batch_size: int = 2
+        batch_size: int = 2,
     ):
         """
         Evaluator for DETR using COCO evaluation metrics.
@@ -64,12 +64,14 @@ class DETREvaluator:
                     nms_threshold=self.nms_iou_threshold,
                     image_size=480,  # Adjust if needed
                     empty_class_id=self.empty_class_id,
-                    out_format="xywh", # COCO format for boxes
-                    scale_boxes=False # We don't want to scale to inference image size as those might differ from the COCO ground truths
+                    out_format="xywh",  # COCO format for boxes
+                    scale_boxes=False,  # We don't want to scale to inference image size as those might differ from the COCO ground truths
                 )
 
                 # Process each image in the batch...
-                for img_idx, (nms_boxes, nms_probs, nms_classes) in enumerate(batch_results):
+                for img_idx, (nms_boxes, nms_probs, nms_classes) in enumerate(
+                    batch_results
+                ):
                     img_id = image_ids[img_idx].item()
 
                     # Skip images where no objects are detected
@@ -77,12 +79,15 @@ class DETREvaluator:
                         continue
 
                     # Get the scaling factors
-                    scale_factors = np.array([
-                        self.coco_gt.imgs[img_id]["width"],
-                        self.coco_gt.imgs[img_id]["height"],
-                        self.coco_gt.imgs[img_id]["width"],
-                        self.coco_gt.imgs[img_id]["height"],
-                    ], dtype=np.float32)
+                    scale_factors = np.array(
+                        [
+                            self.coco_gt.imgs[img_id]["width"],
+                            self.coco_gt.imgs[img_id]["height"],
+                            self.coco_gt.imgs[img_id]["width"],
+                            self.coco_gt.imgs[img_id]["height"],
+                        ],
+                        dtype=np.float32,
+                    )
 
                     # Scale the boxes to image size...
                     nms_boxes = nms_boxes * scale_factors
