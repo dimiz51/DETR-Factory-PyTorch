@@ -62,7 +62,10 @@ class DETR(nn.Module):
         )
 
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model, nhead=n_heads, dim_feedforward=4 * d_model, dropout=0.1
+            d_model=d_model,
+            nhead=n_heads,
+            dim_feedforward=4 * d_model,
+            dropout=0.1,
         )
 
         self.transformer_encoder = nn.TransformerEncoder(
@@ -114,7 +117,7 @@ class DETR(nn.Module):
         # for batch size=4, with 100 queries of embedding dimension 256.
         # Then we pass through the decoder...
         out_decoder = self.transformer_decoder(
-            self.queries.repeat(len(out_encoder), 1, 1), out_encoder
+            self.queries.repeat(out_encoder.shape[0], 1, 1), out_encoder
         )
 
         # Compute outcomes for all intermediate
