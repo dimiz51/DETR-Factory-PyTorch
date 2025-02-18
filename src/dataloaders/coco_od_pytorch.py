@@ -1,7 +1,58 @@
 import torch
 import torchvision.transforms as T
-from torchvision import datasets, ops
+from torchvision import datasets
 from torch.nn.utils.rnn import pad_sequence
+import albumentations as A
+import numpy as np
+from albumentations.pytorch import ToTensorV2
+import torch
+from torchvision.ops import box_convert
+
+
+def augment_transforms_A():
+    """
+    Applies a series of data augmentation transformations to images and their corresponding bounding boxes.
+
+    Returns:
+        A.Compose: An Albumentations composition object that applies the following transformations:
+            - Randomly applies either HueSaturationValue or RandomBrightnessContrast with a probability of 0.9.
+            - Converts the image to grayscale with a probability of 0.01.
+            - Horizontally flips the image with a probability of 0.5.
+            - Vertically flips the image with a probability of 0.5.
+            - Applies a cutout operation with 8 holes of maximum size 64x64 and a fill value of 0, with a probability of 0.5.
+            - Converts the image to a tensor suitable for PyTorch models.
+
+        The bounding box parameters are set to use the YOLO format, with no minimum area or visibility requirements,
+        and the label fields are specified as "labels".
+    """
+    return A.Compose(
+        [
+            A.OneOf(
+                [
+                    A.HueSaturationValue(
+                        hue_shift_limit=0.2,
+                        sat_shift_limit=0.2,
+                        val_shift_limit=0.2,
+                        p=0.9,
+                    ),
+                    A.RandomBrightnessContrast(
+                        brightness_limit=0.2, contrast_limit=0.2, p=0.9
+                    ),
+                ],
+                p=0.9,
+            ),
+            A.ToGray(p=0.01),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            ToTensorV2(p=1),
+        ],
+        bbox_params=A.BboxParams(
+            format="albumentations",
+            min_area=0,
+            min_visibility=0,
+            label_fields=["labels"],
+        ),
+    )
 
 
 def pad_bboxes_with_mask(bboxes_list, max_boxes, pad_value=0.0):
@@ -72,57 +123,46 @@ def pad_classes(class_list, max_classes, pad_value=0):
     return padded_classes
 
 
-def preproc_coco(
-    annotation: dict, im_w: int, im_h: int, max_boxes=100, empty_class_id=0
-):
-    """Pre-processing function to unpack a COCO annotation"
+def preproc_target(annotation, max_boxes=100, empty_class_id=0):
+    """Pre-process COCO annotations: extract boxes and classes, pad and change format.
 
     Args:
-        annotation (dict): COCO annotation
-        im_w (int): Width of the image
-        im_h (int): Height of the image
+        annotation (list): List of COCO annotations.
+        max_boxes (int): Max number of boxes (default: 100).
+        empty_class_id (int): Padding value for empty class (default: 0).
 
     Returns:
-        tuple: (classes, boxes, mask)
+        tuple:
             - classes (torch.Tensor): (max_boxes,)
-            - boxes (torch.Tensor): (max_boxes, 4)
-            - mask (torch.Tensor): (max_boxes,)
+            - boxes (torch.Tensor): (max_boxes, 4) in cxcywh format.
+            - mask (torch.Tensor): (max_boxes,) indicating real vs. padded boxes.
     """
-    anno = [obj for obj in annotation if "iscrowd" not in obj or obj["iscrowd"] == 0]
-
-    # Get the boxes
-    boxes = [obj["bbox"] for obj in anno]
-    boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4)
-
-    # Get the labels for each box
-    classes = [obj["category_id"] for obj in anno]
-    classes = torch.tensor(classes, dtype=torch.int64)
-
-    # Convert from xywh to xyxy and normalize
-    boxes[:, 2:] += boxes[:, :2]
-    boxes[:, 0::2].clamp_(min=0, max=im_w)
-    boxes[:, 1::2].clamp_(min=0, max=im_h)
-
-    # Filter out invalid boxes where x1 > x2 or y1 > y2
-    keep = (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 2] > boxes[:, 0])
-    boxes = boxes[keep]
-    classes = classes[keep]
-
-    # Normalize the boxes (x1, y1, x2, y2)
-    boxes[:, 0::2] /= im_w
-    boxes[:, 1::2] /= im_h
-    boxes.clamp_(min=0, max=1)
-
-    # Pad the boxes to a maximum size... (example padding [..., [-1, -1, -1, -1]])
-    # Mask is a tensor of 1s and 0s (1 for real boxes, 0 for padded ones)
-    boxes, padding_mask = pad_bboxes_with_mask(
-        [boxes], max_boxes=max_boxes, pad_value=-1
+    # Extract boxes & labels
+    boxes = torch.tensor(
+        [obj["bbox"] for obj in annotation], dtype=torch.float32
+    ).reshape(-1, 4)
+    classes = torch.tensor(
+        [obj["category_id"] for obj in annotation], dtype=torch.int64
     )
 
+    # Handle empty case early
+    if len(boxes) == 0:
+        return (
+            torch.full(
+                (max_boxes,), empty_class_id, dtype=torch.int64
+            ),  # Padded classes
+            torch.zeros((max_boxes, 4), dtype=torch.float32),  # Zero boxes
+            torch.zeros((max_boxes,), dtype=torch.uint8),  # Mask: all padded
+        )
+
+    # Pad boxes & classes
+    boxes, padding_mask = pad_bboxes_with_mask(
+        [boxes], max_boxes=max_boxes, pad_value=0
+    )
     classes = pad_classes([classes], max_classes=max_boxes, pad_value=empty_class_id)
 
-    # Convert from xyxy to cxcywh
-    boxes = ops.box_convert(boxes, in_fmt="xyxy", out_fmt="cxcywh")
+    # Convert xyxy → cxcywh
+    boxes = box_convert(boxes, in_fmt="xyxy", out_fmt="cxcywh")
 
     return classes.squeeze(), boxes.squeeze(), padding_mask.squeeze()
 
@@ -152,6 +192,8 @@ class TorchCOCOLoader(datasets.CocoDetection):
         transform=None,
         target_transform=None,
         transforms=None,
+        albumentation_transforms=augment_transforms_A,
+        augment=False,
     ):
         super().__init__(
             root,
@@ -165,6 +207,8 @@ class TorchCOCOLoader(datasets.CocoDetection):
         self.max_boxes = max_boxes
         self.empty_class_id = empty_class_id
         self.image_size = image_size
+        self.augment = augment
+        self.albumentations_transforms = albumentation_transforms()
 
         # Transformations pipeline
         self.T = T.Compose(
@@ -179,17 +223,58 @@ class TorchCOCOLoader(datasets.CocoDetection):
         )
 
         # Transformation function
-        self.T_target = preproc_coco
+        self.T_target = preproc_target
 
     def __getitem__(self, idx):
         img, target = super().__getitem__(idx)
         w, h = img.size
-        image_id = torch.as_tensor([idx], dtype=torch.int64)
+        image_id = torch.tensor([idx], dtype=torch.int64)
 
-        input_ = self.T(img)
-        classes, boxes, padding_mask = self.T_target(
-            target, w, h, max_boxes=self.max_boxes, empty_class_id=self.empty_class_id
+        # Convert to NumPy for Albumentations
+        img_np = np.array(img)
+
+        # Remove crowd annotations...
+        target = [obj for obj in target if obj.get("iscrowd", 0) == 0]
+
+        # Extract raw boxes & labels before processing
+        raw_boxes = torch.tensor(
+            [obj["bbox"] for obj in target], dtype=torch.float32
+        ).reshape(-1, 4)
+        raw_classes = torch.tensor(
+            [obj["category_id"] for obj in target], dtype=torch.int64
         )
+
+        # Convert xywh → xyxy and normalize
+        if raw_boxes.numel() > 0:
+            raw_boxes[:, 2:] += raw_boxes[:, :2]
+            raw_boxes[:, 0::2] /= w
+            raw_boxes[:, 1::2] /= h
+            raw_boxes.clamp_(0, 1)
+        else:
+            raw_boxes = torch.empty((0, 4), dtype=torch.float32)
+            raw_classes = torch.empty((0,), dtype=torch.int64)
+
+        # Apply Albumentations (before padding)
+        if self.augment and self.albumentations_transforms:
+            transformed = self.albumentations_transforms(
+                image=img_np, bboxes=raw_boxes.tolist(), labels=raw_classes.tolist()
+            )
+            img_np = transformed["image"]
+            raw_boxes = torch.tensor(transformed["bboxes"], dtype=torch.float32)
+            raw_classes = torch.tensor(transformed["labels"], dtype=torch.int64)
+
+        # Apply `preproc_coco` for padding & cxcywh conversion
+        classes, boxes, padding_mask = self.T_target(
+            [
+                {"bbox": b.tolist(), "category_id": c.item()}
+                for b, c in zip(raw_boxes, raw_classes)
+            ],
+            max_boxes=self.max_boxes,
+            empty_class_id=self.empty_class_id,
+        )
+
+        # Transform Image (Resize, Normalize)
+        input_ = self.T(T.ToPILImage()(img_np))
 
         return input_, (classes, boxes, padding_mask, image_id)
 
