@@ -34,7 +34,7 @@ def class_based_nms(boxes, probs, iou_threshold=0.5):
 
 
 def run_inference(
-    model, device, inputs, nms_threshold=0.3, image_size=480, empty_class_id=0
+    model, device, inputs, nms_threshold=0.3, image_size=480, empty_class_id=0, out_format = "xyxy", scale_boxes = True
 ):
     """
     Utility function that wraps the inference and post-processing and returns the results for the
@@ -48,6 +48,8 @@ def run_inference(
         nms_threshold (float, optional): NMS threshold for removing overlapping boxes. Default is 0.3.
         image_size (int, optional): Image size for transformations. Default is 480.
         empty_class_id (int, optional): The class ID representing 'no object'. Default is 0.
+        out_format (str, optional): Output format for bounding boxes. Default is "xyxy".
+        scale_boxes (bool, optional): Whether to scale the bounding boxes. Default is True.
 
     Returns:
         List of tuples: Each tuple contains (nms_boxes, nms_probs, nms_classes) for a batch item.
@@ -73,8 +75,12 @@ def run_inference(
         o_bbox = out_bbox[i]
         o_cl = out_cl_probs[i].softmax(dim=-1)
         o_bbox = (
-            ops.box_convert(o_bbox, in_fmt="cxcywh", out_fmt="xyxy") * scale_factors
+            ops.box_convert(o_bbox, in_fmt="cxcywh", out_fmt=out_format)
         )
+
+        # Scale boxes if needed...
+        if scale_boxes:
+            o_bbox = o_bbox * scale_factors
 
         # Filter out boxes with no object...
         o_keep = o_cl.argmax(dim=-1) != empty_class_id

@@ -1,11 +1,9 @@
 import torch
-import numpy as np
-import pycocotools.coco as coco
 from torchvision import datasets
 import pycocotools.cocoeval as cocoeval
 from torch.utils.data import DataLoader
-from utils.inference import class_based_nms
-from torchvision import ops
+from utils.inference import run_inference
+import numpy as np
 
 
 class DETREvaluator:
@@ -17,6 +15,7 @@ class DETREvaluator:
         empty_class_id: int,
         collate_fn: callable,
         nms_iou_threshold: float = 0.5,
+        batch_size: int = 2
     ):
         """
         Evaluator for DETR using COCO evaluation metrics.
@@ -35,9 +34,9 @@ class DETREvaluator:
         self.empty_class_id = empty_class_id
         self.nms_iou_threshold = nms_iou_threshold
 
-        # Create DataLoader with batch_size=1 (required for COCO eval) and no shuffling
+        # Create DataLoader and no shuffling
         self.dataloader = DataLoader(
-            coco_dataset, batch_size=2, shuffle=False, collate_fn=collate_fn
+            coco_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn
         )
 
     def evaluate(self):
@@ -57,57 +56,38 @@ class DETREvaluator:
 
         with torch.no_grad():
             for ix, (input_, (_, _, _, image_ids)) in enumerate(self.dataloader):
-                # Move inputs to device
-                input_ = input_.to(self.device)
-                outputs = self.model(input_)
-                out_cl, out_bbox = outputs["layer_5"].values()
-
-                # Squeeze and apply activations
-                out_bbox = out_bbox.sigmoid().cpu()
-                out_cl = out_cl.cpu()
-
-                batch_size = input_.shape[0]
+                # Extract inference results
+                batch_results = run_inference(
+                    self.model,
+                    self.device,
+                    input_,
+                    nms_threshold=self.nms_iou_threshold,
+                    image_size=480,  # Adjust if needed
+                    empty_class_id=self.empty_class_id,
+                    out_format="xywh", # COCO format for boxes
+                    scale_boxes=False # We don't want to scale to inference image size as those might differ from the COCO ground truths
+                )
 
                 # Process each image in the batch...
-                for img_idx in range(batch_size):
-                    o_probs = out_cl[img_idx].softmax(dim=-1)
-                    o_bbox = out_bbox[img_idx]
+                for img_idx, (nms_boxes, nms_probs, nms_classes) in enumerate(batch_results):
                     img_id = image_ids[img_idx].item()
 
-                    # Get ground truth image size for rescaling...
-                    scale_factors = torch.tensor(
-                        [
-                            self.coco_gt.imgs[img_id]["width"],
-                            self.coco_gt.imgs[img_id]["height"],
-                            self.coco_gt.imgs[img_id]["width"],
-                            self.coco_gt.imgs[img_id]["height"],
-                        ],
-                        dtype=torch.float32,
-                    )
-
-                    # Convert bounding boxes to COCO format() and scale to image size
-                    o_bbox = (
-                        ops.box_convert(o_bbox, in_fmt="cxcywh", out_fmt="xywh")
-                        * scale_factors
-                    )
-
-                    # Filter out "no object" predictions
-                    o_keep = o_probs.argmax(dim=-1) != self.empty_class_id
-
-                    # If no object is predicted, skip this image
-                    if o_keep.sum() == 0:
+                    # Skip images where no objects are detected
+                    if len(nms_boxes) == 0:
                         continue
 
-                    # Filter out "empty box" predictions
-                    keep_boxes = o_bbox[o_keep]
-                    keep_probs = o_probs[o_keep]
+                    # Get the scaling factors
+                    scale_factors = np.array([
+                        self.coco_gt.imgs[img_id]["width"],
+                        self.coco_gt.imgs[img_id]["height"],
+                        self.coco_gt.imgs[img_id]["width"],
+                        self.coco_gt.imgs[img_id]["height"],
+                    ], dtype=np.float32)
 
-                    # Apply class-based NMS
-                    nms_boxes, nms_probs, nms_classes = class_based_nms(
-                        keep_boxes, keep_probs, iou_threshold=self.nms_iou_threshold
-                    )
+                    # Scale the boxes to image size...
+                    nms_boxes = nms_boxes * scale_factors
 
-                    # Convert to COCO format
+                    # Convert detections to COCO format
                     for j in range(len(nms_classes)):
                         results.append(
                             {
