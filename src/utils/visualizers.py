@@ -4,10 +4,9 @@ import torchvision.transforms as T
 from torch.utils.data import DataLoader
 from torchvision import ops
 import torch
-from utils.inference import class_based_nms, run_inference
+from utils.inference import run_inference
 import cv2
 from PIL import Image
-from torchvision.transforms.functional import to_tensor, to_pil_image
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 import os
 
