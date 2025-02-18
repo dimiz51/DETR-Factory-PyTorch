@@ -6,7 +6,9 @@ import numpy as np
 
 def class_based_nms(boxes, probs, iou_threshold=0.5):
     """
-    Performs non-maximum suppression (NMS) on bounding boxes based on class probabilities.
+    Performs non-maximum suppression (NMS) on bounding boxes to filter out overlapping
+    boxes for each class. This is usually not needed for DETR as it usually does not produce
+    overlapping boxes (if trained long enough).
 
     Args:
         boxes (torch.Tensor): Bounding boxes in the format (xmin, ymin, xmax, ymax). Shape: [num_boxes, 4]

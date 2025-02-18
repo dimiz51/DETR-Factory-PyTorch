@@ -16,6 +16,7 @@ class DETREvaluator:
         collate_fn: callable,
         nms_iou_threshold: float = 0.5,
         batch_size: int = 2,
+        image_size: int = 480,
     ):
         """
         Evaluator for DETR using COCO evaluation metrics.
@@ -33,6 +34,7 @@ class DETREvaluator:
         self.coco_gt = coco_dataset.coco  # COCO ground truth annotations
         self.empty_class_id = empty_class_id
         self.nms_iou_threshold = nms_iou_threshold
+        self.image_size = image_size
 
         # Create DataLoader and no shuffling
         self.dataloader = DataLoader(
@@ -62,7 +64,7 @@ class DETREvaluator:
                     self.device,
                     input_,
                     nms_threshold=self.nms_iou_threshold,
-                    image_size=480,  # Adjust if needed
+                    image_size=self.image_size,
                     empty_class_id=self.empty_class_id,
                     out_format="xywh",  # COCO format for boxes
                     scale_boxes=False,  # We don't want to scale to inference image size as those might differ from the COCO ground truths

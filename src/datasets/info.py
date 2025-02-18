@@ -95,6 +95,11 @@ COCO_CLASSES = [
     "empty",
 ]
 
+COCO_PEOPLE = [
+    "N/A",
+    "person",
+]
+
 
 # --------------------------------------------------------
 
@@ -106,5 +111,12 @@ DATASET_CLASSES = {
             "images": "http://images.cocodataset.org/zips/train2017.zip",
             "annotations": "http://images.cocodataset.org/annotations/annotations_trainval2017.zip",
         },
-    }
+    },
+    "coco_people": {
+        "class_names": COCO_PEOPLE,
+        "empty_class_id": 0,
+        "links": {
+            "roboflow": "https://universe.roboflow.com/shreks-swamp/coco-dataset-limited--person-only"
+        },
+    },
 }
