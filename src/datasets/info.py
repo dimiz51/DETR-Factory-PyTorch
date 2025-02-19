@@ -100,7 +100,7 @@ COCO_PEOPLE = [
     "person",
 ]
 
-CHESS_PIECES_SINGLE_CLASS = [
+CHESS_PIECES_HQ = [
     "N/A",
     "chess_piece",
 ]
@@ -124,11 +124,11 @@ DATASET_CLASSES = {
             "roboflow": "https://universe.roboflow.com/shreks-swamp/coco-dataset-limited--person-only"
         },
     },
-    "chess_pieces_single_class": {
-        "class_names": CHESS_PIECES_SINGLE_CLASS,
+    "chess_pieces_hq": {
+        "class_names": CHESS_PIECES_HQ,
         "empty_class_id": 0,
         "links": {
-            "roboflow": "https://public.roboflow.com/object-detection/chess-full"
+            "roboflow": "https://universe.roboflow.com/myroboflowprojects/chess-pieces-hq"
         },
     },
 }

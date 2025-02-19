@@ -73,7 +73,7 @@ class DETRBoxVisualizer:
         """
         return self.unnormalize(tensor)
 
-    def _visualize_image(self, im, boxes, class_ids, scores=None, ax=None):
+    def _visualize_image(self, im, boxes, class_ids, scores=None, ax=None, show_scores=True):
         """
         Visualizes a single image with bounding boxes and predicted probabilities.
         NOTE: The boxes tensors is expected to be in the format (xmin, ymin, xmax, ymax) and
@@ -85,6 +85,7 @@ class DETRBoxVisualizer:
             class_ids (np.array): Class IDs for each box.
             scores (np.array, optional): Probabilities for each box.
             ax (matplotlib.axes.Axes, optional): Matplotlib axis object.
+            show_scores (bool, optional): Whether to show the predicted probabilities.
         """
         if ax is None:
             ax = plt.gca()
@@ -114,12 +115,6 @@ class DETRBoxVisualizer:
 
             color = self.class_to_color[cl]
 
-            text = (
-                f"{self.class_labels[cl]}"
-                if score is None
-                else f"{self.class_labels[cl]}: {score:0.2f}"
-            )
-
             # Draw bounding box
             patch = plt.Rectangle(
                 (xmin, ymin),
@@ -132,6 +127,11 @@ class DETRBoxVisualizer:
             ax.add_patch(patch)
 
             # Add label text
+            text = (
+                f"{self.class_labels[cl]}"
+                if score is None or not show_scores
+                else f"{self.class_labels[cl]}: {score:0.2f}"
+            )
             ax.text(
                 xmin, ymin, text, fontsize=7, bbox=dict(facecolor="yellow", alpha=0.5)
             )

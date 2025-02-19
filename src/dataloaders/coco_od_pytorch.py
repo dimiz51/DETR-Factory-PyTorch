@@ -9,9 +9,13 @@ import torch
 from torchvision.ops import box_convert
 
 
-def augment_transforms_A():
+def augment_transforms_A(crop_width=480, crop_height=480):
     """
     Applies a series of data augmentation transformations to images and their corresponding bounding boxes.
+
+    Args:
+        crop_width (int, optional): Width of the cropped image. Default is 480.
+        crop_height (int, optional): Height of the cropped image. Default is 480.
 
     Returns:
         A.Compose: An Albumentations composition object that applies the following transformations:
@@ -29,21 +33,16 @@ def augment_transforms_A():
         [
             A.OneOf(
                 [
-                    A.HueSaturationValue(
-                        hue_shift_limit=0.2,
-                        sat_shift_limit=0.2,
-                        val_shift_limit=0.2,
-                        p=0.9,
-                    ),
                     A.RandomBrightnessContrast(
-                        brightness_limit=0.2, contrast_limit=0.2, p=0.9
+                        brightness_limit=0.2, contrast_limit=0.2, p=0.6
                     ),
+                    A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.6),
                 ],
-                p=0.9,
+                p=0.7,
             ),
-            A.ToGray(p=0.01),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
+            A.RandomSizedBBoxSafeCrop(width=crop_width, height=crop_height, erosion_rate=0.2, p = 0.15),
+            A.HorizontalFlip(p=0.35),
+            A.VerticalFlip(p=0.35),
             ToTensorV2(p=1),
         ],
         bbox_params=A.BboxParams(
@@ -192,7 +191,7 @@ class TorchCOCOLoader(datasets.CocoDetection):
         transform=None,
         target_transform=None,
         transforms=None,
-        albumentation_transforms=augment_transforms_A,
+        albumentation_transforms=None,
         augment=False,
     ):
         super().__init__(
@@ -208,7 +207,7 @@ class TorchCOCOLoader(datasets.CocoDetection):
         self.empty_class_id = empty_class_id
         self.image_size = image_size
         self.augment = augment
-        self.albumentations_transforms = albumentation_transforms()
+        self.albumentations_transforms = augment_transforms_A(image_size, image_size) if albumentation_transforms is None else albumentation_transforms
 
         # Transformations pipeline
         self.T = T.Compose(

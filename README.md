@@ -3,7 +3,7 @@ This project is an implementation of the Detection Transformer(DETR) for state-o
 
 This project makes training, fine-tuning and evaluation of the DETR model simple and straightforward on your own dataset. 
 
-**Note**: Feel free to share thoughts, raise issues or open a PR if you feel like it to help in developing this project.
+**Note**: Feel free to share thoughts, raise issues or open a PR if you feel like helping with developing this project further.
 
 ## Contents
 
@@ -73,12 +73,12 @@ The [DETR notebook](./src/detr.ipynb) provides an end-to-end workfow for trainin
 
 
 ## Case study: Fine-tuning and evaluating DETR on a small dataset
-To showcase and test that all the parts of this project were implemented correctly, I conducted a small case study. Using the [DETR notebook](./src/detr.ipynb), some pre-trained weights from a previous experiment and the [Chess pieces](https://public.roboflow.com/object-detection/chess-full) dataset from [Roboflow](https://roboflow.com/) I have attempted to train DETR how to detect chess pieces in a chess board.
+To showcase and test that all the parts of this project were implemented correctly, I conducted a small case study. Using the [DETR notebook](./src/detr.ipynb), some pre-trained weights from a previous experiment and the [Chess pieces HQ](https://universe.roboflow.com/myroboflowprojects/chess-pieces-hq) dataset from [Roboflow](https://roboflow.com/) I have attempted to train DETR how to detect chess pieces in a chess board.
 
 ## Training the model
 Transformers typically require a **significant amount of training time**, especially when trained from scratch. Therefore, it is highly recommended to fine-tune the model instead and start the training using pre-trained weights for all the heads.
 
-For this PoC case study, **I have used pre-trained weights from a previous training with the COCO dataset** and then finetuned the model over the much smaller chess pieces dataset for another 100 epochs. You can find the pre-trained weights and weights from this experiment [here](#pre-trained-weights-for-detr).
+For this PoC case study, **I have used pre-trained weights from a previous training with the COCO dataset** and then finetuned the model over the much smaller chess dataset for another 100 epochs. You can find the pre-trained weights and weights from this experiment [here](#pre-trained-weights-for-detr).
 
 The total loss (weight sum of the GIoU, L1 bounding box loss and classification loss) as well as the separate losses from training time can be seen below:
 
@@ -92,9 +92,9 @@ The total loss (weight sum of the GIoU, L1 bounding box loss and classification 
 </p>
 <p align="center"><b>Figure 2:</b> Detailed DETR losses from training time</p>
 
-As we can observe there seems to be much more space for improvements, as probably training for more epochs and/or adding augmentations could probably lead to much better performance, however performance **seems quite decent for the Proof-of-Concept(PoC) nature of the project.**
+As we can observe there seems to be much more space for improvements, as probably training for more epochs could probably lead to much better performance. Nevertheless, performance **seems quite decent for this Proof-of-Concept(PoC) case study.**
 
-## Example inference results
+## Inference on the testing set
 Some example results from our trained DETR model over samples from the testing set of our dataset:
 <p align="center">
   <img src="./readme-images/predicts_1.png" alt="Predictions Sample 1">
@@ -106,33 +106,39 @@ Some example results from our trained DETR model over samples from the testing s
 </p>
 <p align="center"><b>Figure 4:</b> Model predictions on sample image 2.</p>
 
+## Inference on unseen data
+As we can see, despite the fact that the model was trained on a relatively small dataset with limited variance, it still demonstrates promising adaptability and meaningful detection capabilities.
+
+<p align="center">
+  <img src="./readme-images/demo_chess.gif" alt="Predictions Demo">
+</p>
+<p align="center"><b>Figure 4:</b> Inference on data not used during training</p>
+
 ## Evaluation results
 The COCO API (see [pycocotools](https://pypi.org/project/pycocotools/)) offers various tools we can use to work with COCO-formatted datasets. One of the tools is a simple and effective evaluation suite which I have used to build an evaluator for our object detection model.
 
 
-After evaluating the model, trained on ~600 images from the [Chess pieces](https://public.roboflow.com/object-detection/chess-full), using the customized [DETR Evaluator](./src/models/evaluator.py) we got the following performance metrics over the small unseen testing set:
+After evaluating the model, trained on ~900 images from the [Chess pieces HQ](https://universe.roboflow.com/myroboflowprojects/chess-pieces-hq), using the customized [DETR Evaluator](./src/models/evaluator.py) we got the following performance metrics over the small unseen testing set:
 
 | Metric                   | Area    | Value  |
 |--------------------------|--------|--------|
-| **Average Precision (AP)** | all    | **0.259** |
-| **Average Precision (AP)** | all (IoU=0.50) | **0.546** |
-| **Average Precision (AP)** | all (IoU=0.75) | **0.188** |
-| **Average Precision (AP)** | small  | **0.241** |
-| **Average Precision (AP)** | medium | **0.264** |
-| **Average Precision (AP)** | large  | **-1.000** |
-| **Average Recall (AR)**    | all (maxDets=1)   | **0.080** |
-| **Average Recall (AR)**    | all (maxDets=10)  | **0.283** |
-| **Average Recall (AR)**    | all (maxDets=100) | **0.317** |
-| **Average Recall (AR)**    | small  | **0.266** |
-| **Average Recall (AR)**    | medium | **0.329** |
-| **Average Recall (AR)**    | large  | **-1.000** |
+| **Average Precision (AP)** | all    | **0.271** |
+| **Average Precision (AP)** | all (IoU=0.50) | **0.582** |
+| **Average Precision (AP)** | all (IoU=0.75) | **0.218** |
+| **Average Precision (AP)** | small  | **0.058** |
+| **Average Precision (AP)** | medium | **0.308** |
+| **Average Precision (AP)** | large  | **0.526** |
+| **Average Recall (AR)**    | all (maxDets=1)   | **0.041** |
+| **Average Recall (AR)**    | all (maxDets=10)  | **0.234** |
+| **Average Recall (AR)**    | all (maxDets=100) | **0.336** |
+| **Average Recall (AR)**    | small  | **0.094** |
+| **Average Recall (AR)**    | medium | **0.378** |
+| **Average Recall (AR)**    | large  | **0.553** |
 
 ### Analysis of Model Performance
-The model performs moderately well, with an overall AP of 0.259. It detects objects well at IoU=0.50 (AP=0.546) but struggles with precise localization at IoU=0.75 (AP=0.188).
+The model performs moderately well, with an overall AP of ~0.25. It detects objects well at IoU=0.50 (AP=0.580) but struggles with precise localization at IoU=0.75 (~AP=0.22) and very small objects. This however, is somewhat expected, as the dataset I annotated and used for this might not contain enough variance.
 
-Since the dataset mainly contains small and medium objects, the AP for small (0.241) and medium (0.264) objects is similar. Large objects (-1.000 AP/AR) do not exist in the dataset so the negative AR/AP values are reasonable.
-
-Recall improves with more detections (AR=0.080 for maxDets=1, rising to 0.317 for maxDets=100). The model performs better on medium-sized objects (AR=0.329) than small ones (AR=0.266), aligning with dataset composition.
+Recall improves with more detections (AR=0.051 for maxDets=1, rising to ~0.38 for maxDets=100 for medium and ~0.55 for larger objects).
 
 ## Train, fine-tune or evaluate your own DETR model for object detection
 
@@ -143,14 +149,21 @@ Training a DETR model for object detection is made as simple as possible with th
 You can test the model's performance using any of the trained weights listed below or use these as a starting point to fine-tune a DETR model on your own dataset.
 
 ### 🏆 Model Checkpoints
+You can use any of the weights listed below depending on the task you want to solve. 
 
-| 🗂 **Dataset** | 🔁 **Epochs** | 📂 **Weights** |
+**NOTE**: Only the COCO weights were trained from scratch, the rest of the checkpoints come from models fine-tuned on the COCO weights.
+
+| 🗂 **Dataset** | 🔁 **Epochs(T+F)** | 📂 **Weights** |
 |--------------|-------------|----------------|
 | [COCO](https://cocodataset.org/#home) | **150** | [⬇ coco_detr_150.pt](https://drive.google.com/file/d/15mHkKghGy8fltpz2Wqcw137imzSiVFGh/view?usp=drive_link) |
-| [Chess Pieces*](https://public.roboflow.com/object-detection/chess-full) | **100** | [⬇ chess_pieces_100.pt](https://drive.google.com/file/d/1BpB9cXBm2EIvHfKSbe5NCSAgzloPCY7r/view?usp=drive_link) |
+| [Chess Pieces HQ](https://universe.roboflow.com/myroboflowprojects/chess-pieces-hq) | **250** | [⬇ chess_pieces_100.pt](https://drive.google.com/file/d/1BpB9cXBm2EIvHfKSbe5NCSAgzloPCY7r/view?usp=drive_link) |
+| [COCO-People only](https://universe.roboflow.com/shreks-swamp/coco-dataset-limited--person-only) | **195** | [⬇ coco_people_45.pt](https://drive.google.com/file/d/1GFkyJBzaOH0hJRi3XEE-dD61phjwP2oW/view?usp=drive_link) |
 
-
-*The **"Chess pieces"** dataset from Roboflow was converted to a binary detection task for the sake of validating that the training is working. Therefore, **the various original object classes (e.g. king, knight etc.) were replaced by a single class ("chess_piece")** in this experiment.
+As you will see [here](#create-a-pytorch-dataloader-and-parse-your-dataset), you can load the dataset-specific information (e.g. "empty" box class ID, class names etc.) for all the dataset's listed above. You can look for the available keys as:
+```
+from datasets.info import DATASET_CLASSES
+print(f"Available datasets: {DATASET_CLASSES.keys()}")
+```
 
 ### Using the notebook
 You can use the [DETR notebook](./src/detr.ipynb) either on Collab or locally and train/evaluate a model either on a GPU or CPU machine. The code handles the data transfers for both evaluation/inference/training automatically depending on your system. 
