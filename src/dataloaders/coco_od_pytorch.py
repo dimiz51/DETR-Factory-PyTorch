@@ -36,11 +36,15 @@ def augment_transforms_A(crop_width=480, crop_height=480):
                     A.RandomBrightnessContrast(
                         brightness_limit=0.2, contrast_limit=0.2, p=0.6
                     ),
-                    A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.6),
+                    A.ColorJitter(
+                        brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.6
+                    ),
                 ],
                 p=0.7,
             ),
-            A.RandomSizedBBoxSafeCrop(width=crop_width, height=crop_height, erosion_rate=0.2, p = 0.15),
+            A.RandomSizedBBoxSafeCrop(
+                width=crop_width, height=crop_height, erosion_rate=0.2, p=0.15
+            ),
             A.HorizontalFlip(p=0.35),
             A.VerticalFlip(p=0.35),
             ToTensorV2(p=1),
@@ -207,7 +211,11 @@ class TorchCOCOLoader(datasets.CocoDetection):
         self.empty_class_id = empty_class_id
         self.image_size = image_size
         self.augment = augment
-        self.albumentations_transforms = augment_transforms_A(image_size, image_size) if albumentation_transforms is None else albumentation_transforms
+        self.albumentations_transforms = (
+            augment_transforms_A(image_size, image_size)
+            if albumentation_transforms is None
+            else albumentation_transforms
+        )
 
         # Transformations pipeline
         self.T = T.Compose(

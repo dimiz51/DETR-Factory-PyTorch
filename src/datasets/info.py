@@ -100,6 +100,11 @@ COCO_PEOPLE = [
     "person",
 ]
 
+PEOPLE_HQ = [
+    "N/A",
+    "person",
+]
+
 CHESS_PIECES_HQ = [
     "N/A",
     "chess_piece",
@@ -129,6 +134,13 @@ DATASET_CLASSES = {
         "empty_class_id": 0,
         "links": {
             "roboflow": "https://universe.roboflow.com/myroboflowprojects/chess-pieces-hq"
+        },
+    },
+    "people_hq": {
+        "class_names": PEOPLE_HQ,
+        "empty_class_id": 0,
+        "links": {
+            "roboflow": "https://universe.roboflow.com/myroboflowprojects/people_hq"
         },
     },
 }

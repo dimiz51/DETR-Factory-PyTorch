@@ -110,7 +110,7 @@ class DETR(nn.Module):
         tokens = rearrange(tokens, "b c h w -> b (h w) c")
 
         # Pass encoded patches through encoder...
-        out_encoder = self.transformer_encoder(tokens + self.pe_encoder)
+        out_encoder = self.transformer_encoder((tokens + self.pe_encoder))
 
         # We expand so each image of each batch get's it's own copy of the
         # query embeddings. So from (1, 100, 256) to (4, 100, 256) for example

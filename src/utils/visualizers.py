@@ -73,7 +73,9 @@ class DETRBoxVisualizer:
         """
         return self.unnormalize(tensor)
 
-    def _visualize_image(self, im, boxes, class_ids, scores=None, ax=None, show_scores=True):
+    def _visualize_image(
+        self, im, boxes, class_ids, scores=None, ax=None, show_scores=True
+    ):
         """
         Visualizes a single image with bounding boxes and predicted probabilities.
         NOTE: The boxes tensors is expected to be in the format (xmin, ymin, xmax, ymax) and
