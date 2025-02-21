@@ -146,6 +146,7 @@ class DETRBoxVisualizer:
         collate_fn=None,
         image_size=480,
         nms_threshold=0.3,
+        output_layer="layer_5",
     ):
         """
         Performs inference on the validation dataset and visualizes predictions.
@@ -157,6 +158,7 @@ class DETRBoxVisualizer:
             collate_fn(fn, optional): Collate function to create a dataloader from the dataset
             image_size(int, optional): The image size of the images in the dataset (Default: 480)
             nms_threshold(float, optional): The threshold for NMS (Default: 0.5)
+            output_layer(str, optional): The output layer to use for inference (Default: "layer_5")
         """
         if dataset is None:
             raise ValueError("No validation dataset provided for inference!")
@@ -169,7 +171,13 @@ class DETRBoxVisualizer:
         # Move inputs to GPU if available and run inference
         print(f"Running inference on device: {self.device}")
         inference_results = run_inference(
-            model, self.device, inputs, nms_threshold, image_size, self.empty_class_id
+            model=model,
+            device=self.device,
+            inputs=inputs,
+            nms_threshold=nms_threshold,
+            image_size=image_size,
+            empty_class_id=self.empty_class_id,
+            output_layer=output_layer,
         )
 
         fig, axs = plt.subplots(
@@ -216,6 +224,7 @@ class DETRBoxVisualizer:
         image_size=480,
         batch_size=5,
         nms_threshold=0.3,
+        output_layer="layer_5",
     ):
         """
         Processes a video, runs inference in batches of frames, visualizes results, and saves a new video.
@@ -227,6 +236,7 @@ class DETRBoxVisualizer:
             image_size (int, optional): Image size for transformations. Default is 480.
             batch_size (int, optional): Number of frames per inference batch. Default is 5.
             nms_threshold (float, optional): NMS threshold for removing overlapping boxes. Default is 0.3.
+            output_layer (str, optional): The output layer to use for inference. Default is "layer_5".
         """
         # Open video
         cap = cv2.VideoCapture(video_path)
@@ -281,12 +291,13 @@ class DETRBoxVisualizer:
 
                 # Run inference using the specified device...
                 inference_results = run_inference(
-                    model,
-                    self.device,
-                    batch_input,
-                    nms_threshold,
-                    image_size,
-                    self.empty_class_id,
+                    model=model,
+                    device=self.device,
+                    inputs=batch_input,
+                    nms_threshold=nms_threshold,
+                    image_size=image_size,
+                    empty_class_id=self.empty_class_id,
+                    output_layer=output_layer,
                 )
 
                 for i in range(batch_size):

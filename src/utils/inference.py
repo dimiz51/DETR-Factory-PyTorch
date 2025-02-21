@@ -44,6 +44,7 @@ def run_inference(
     empty_class_id=0,
     out_format="xyxy",
     scale_boxes=True,
+    output_layer="layer_5",
 ):
     """
     Utility function that wraps the inference and post-processing and returns the results for the
@@ -59,6 +60,7 @@ def run_inference(
         empty_class_id (int, optional): The class ID representing 'no object'. Default is 0.
         out_format (str, optional): Output format for bounding boxes. Default is "xyxy".
         scale_boxes (bool, optional): Whether to scale the bounding boxes. Default is True.
+        output_layer (str, optional): The output layer to use for inference. Default is "layer_5".
 
     Returns:
         List of tuples: Each tuple contains (nms_boxes, nms_probs, nms_classes) for a batch item.
@@ -73,7 +75,7 @@ def run_inference(
     with torch.no_grad():
         outputs = model(inputs)
 
-    out_cl, out_bbox = outputs["layer_5"].values()
+    out_cl, out_bbox = outputs[output_layer].values()
     out_bbox = out_bbox.sigmoid().cpu()
     out_cl_probs = out_cl.cpu()
 
