@@ -4,24 +4,6 @@ from torch import nn
 import torch
 
 
-def get_hook(outs, name):
-    """This will store a layer's output in a dictionary using a forward hook
-
-    Args:
-        outs (dict): Dictionary to store the layer's output
-        name (str): Name of the layer
-
-    Returns:
-        hook (function): A forward hook
-
-    """
-
-    def hook(self, input, output):
-        outs[name] = output
-
-    return hook
-
-
 class DETR(nn.Module):
     """Detection Transformer (DETR) model with a ResNet50 backbone.
 
@@ -93,12 +75,6 @@ class DETR(nn.Module):
         self.linear_class = nn.Linear(d_model, n_classes)
         self.linear_bbox = nn.Linear(d_model, 4)
 
-        # Add hooks to get intermediate outcomes
-        self.decoder_outs = {}
-        for i, L in enumerate(self.transformer_decoder.layers):
-            name = f"layer_{i}"
-            L.register_forward_hook(get_hook(self.decoder_outs, name))
-
     def forward(self, x):
         # Pass inputs through the CNN backbone...
         tokens = self.backbone(x)["layer4"]
@@ -115,19 +91,20 @@ class DETR(nn.Module):
         # We expand so each image of each batch get's it's own copy of the
         # query embeddings. So from (1, 100, 256) to (4, 100, 256) for example
         # for batch size=4, with 100 queries of embedding dimension 256.
-        # Then we pass through the decoder...
-        out_decoder = self.transformer_decoder(
-            self.queries.repeat(out_encoder.shape[0], 1, 1), out_encoder
-        )
+        queries = self.queries.repeat(out_encoder.shape[0], 1, 1)
 
         # Compute outcomes for all intermediate
         # decoder's layers...
-        # NOTE: The hook we registered previously is called during each
-        # forward pass and will store the layer's output in 'self.decoder_outs',
-        # where we can easily access them and then pass them through
-        # linear layers for prediction.
-        outs = {}
-        for n, o in self.decoder_outs.items():
-            outs[n] = {"cl": self.linear_class(o), "bbox": self.linear_bbox(o)}
+        class_preds = []
+        bbox_preds = []
 
-        return outs
+        for layer in self.transformer_decoder.layers:
+            queries = layer(queries, out_encoder)
+            class_preds.append(self.linear_class(queries))
+            bbox_preds.append(self.linear_bbox(queries))
+
+        # Stack and return
+        class_preds = torch.stack(class_preds, dim=1)
+        bbox_preds = torch.stack(bbox_preds, dim=1)
+
+        return class_preds, bbox_preds
