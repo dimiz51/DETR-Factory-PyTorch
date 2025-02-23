@@ -259,7 +259,7 @@ class DETRTrainer:
                 tgt_mask = tgt_mask.bool().to(self.device)
 
                 # Run inference
-                outs = self.model(input_)
+                class_preds, bbox_preds = self.model(input_)
 
                 # Accumulate losses
                 loss = torch.tensor(0.0, device=self.device)
@@ -267,26 +267,30 @@ class DETRTrainer:
                 loss_bbox_batch = torch.tensor(0.0, device=self.device)
                 loss_giou_batch = torch.tensor(0.0, device=self.device)
 
-                for name, out in outs.items():
-                    out["bbox"] = out["bbox"].sigmoid().to(self.device)
-                    out["cl"] = out["cl"].to(self.device)
+                num_dec_layers = class_preds.shape[1]
 
-                    for o_bbox, t_bbox, o_cl, t_cl, t_mask in zip(
-                        out["bbox"], tgt_bbox, out["cl"], tgt_cl, tgt_mask
+                for i in range(num_dec_layers):
+                    o_bbox = bbox_preds[:, i, :, :].sigmoid().to(self.device)
+                    o_cl = class_preds[:, i, :, :].to(self.device)
+
+                    for o_bbox_i, t_bbox, o_cl_i, t_cl, t_mask in zip(
+                        o_bbox, tgt_bbox, o_cl, tgt_cl, tgt_mask
                     ):
 
                         loss_class, loss_bbox, loss_giou = self.compute_loss(
-                            o_bbox, t_bbox, o_cl, t_cl, t_mask
+                            o_bbox_i, t_bbox, o_cl_i, t_cl, t_mask
                         )
 
                         sample_loss = 1 * loss_class + 5 * loss_bbox + 2 * loss_giou
 
-                        loss += sample_loss / self.batch_size / len(outs)
+                        loss += sample_loss / self.batch_size / num_dec_layers
 
                         # Track individual losses per batch
-                        loss_class_batch += loss_class / self.batch_size / len(outs)
-                        loss_bbox_batch += loss_bbox / self.batch_size / len(outs)
-                        loss_giou_batch += loss_giou / self.batch_size / len(outs)
+                        loss_class_batch += (
+                            loss_class / self.batch_size / num_dec_layers
+                        )
+                        loss_bbox_batch += loss_bbox / self.batch_size / num_dec_layers
+                        loss_giou_batch += loss_giou / self.batch_size / num_dec_layers
 
                 self.optimizer.zero_grad(set_to_none=True)
                 loss.backward()
