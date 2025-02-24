@@ -2,6 +2,25 @@ from einops import rearrange
 from torchvision.models.feature_extraction import create_feature_extractor
 from torch import nn
 import torch
+from torchvision.ops.misc import FrozenBatchNorm2d
+
+
+def use_frozen_batchnorm(module):
+    """Recursively replace all BatchNorm2d layers with FrozenBatchNorm2d."""
+    for name, child in module.named_children():
+        if isinstance(child, torch.nn.BatchNorm2d):
+            # Copy existing parameters from the BatchNorm2d....
+            frozen_bn = FrozenBatchNorm2d(child.num_features)
+            frozen_bn.weight.data = child.weight.data
+            frozen_bn.bias.data = child.bias.data
+            frozen_bn.running_mean.data = child.running_mean.data
+            frozen_bn.running_var.data = child.running_var.data
+
+            # Replace the layer in the model inplace...
+            setattr(module, name, frozen_bn)
+        else:
+            # Recursively apply to child modules
+            use_frozen_batchnorm(child)
 
 
 class DETR(nn.Module):
@@ -29,6 +48,7 @@ class DETR(nn.Module):
         n_layers=6,
         n_heads=8,
         n_queries=100,
+        use_frozen_bn=False,
     ):
         super().__init__()
 
@@ -36,6 +56,11 @@ class DETR(nn.Module):
             torch.hub.load("pytorch/vision:v0.10.0", "resnet50", pretrained=True),
             return_nodes={"layer4": "layer4"},
         )
+
+        # Replace BatchNorm2d with FrozenBatchNorm2d...
+        # BatchNorm2D makes inference unstable for DETR...
+        if use_frozen_bn:
+            use_frozen_batchnorm(self.backbone)
 
         self.conv1x1 = nn.Conv2d(2048, d_model, kernel_size=1, stride=1)
 

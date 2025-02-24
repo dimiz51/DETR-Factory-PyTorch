@@ -246,11 +246,14 @@ class DETRBoxVisualizer:
 
         transform = T.Compose(
             [
-                T.Resize((image_size, image_size), antialias=True),
                 T.ToTensor(),
+                # We need this normalization as our CNN backbone
+                # is trained on ImageNet:
+                # - https://pytorch.org/vision/main/models/generated/torchvision.models.resnet50.html#torchvision.models.resnet50
                 T.Normalize(
                     mean=self.normalization_params[0], std=self.normalization_params[1]
                 ),
+                T.Resize((image_size, image_size), antialias=True),
             ]
         )
 
