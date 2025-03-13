@@ -1,7 +1,7 @@
 # Building and training the DETR (Detection Transformer) model with PyTorch
-This project is an implementation of the Detection Transformer(DETR) for state-of-the-art object detection using the well-known Transformer architecture. 
+This project is an implementation of the Detection Transformer(DETR) and the Conditional DETR(CondDETR) variant, for state-of-the-art object detection using the well-known Transformer architecture. 
 
-This project makes training, fine-tuning and evaluation of the DETR model simple and straightforward on your own dataset. 
+This project makes training, fine-tuning and evaluation of the DETR models simple and straightforward on your own dataset. 
 
 **Note**: Feel free to share thoughts, raise issues or open a PR if you feel like helping with developing this project further.
 
@@ -22,7 +22,7 @@ This project makes training, fine-tuning and evaluation of the DETR model simple
 ## What is DETR? How can we use it for object detection?
 Detection Transformer (DETR) is an object detection model developed by **Meta AI**. It combines Transformers with CNNs to directly predict object bounding boxes and labels without the need for region proposals or post-processing like Non-Maximum Suppression (NMS). DETR excels at handling complex scenes and works well without the need of complex post-processing techniques or anchor boxes.
 
-### The architecture
+### The baseline DETR architecture
 
 <p align="center">
   <img src="./readme-images/detr.webp" alt="DETR Architecture">
@@ -30,6 +30,15 @@ Detection Transformer (DETR) is an object detection model developed by **Meta AI
 <p align="center"><b>Figure 1:</b> The baseline architecture for DETR</p>
 
 This end-to-end object detection model combines a convolutional backbone (such as ResNet) for feature extraction with a Transformer encoder-decoder architecture. The Transformer processes image features as a sequence of embeddings, capturing global relationships across the image. Instead of traditional region proposals, DETR uses a set-based prediction approach with learnable object queries and bipartite matching loss (Hungarian algorithm) to directly predict object bounding boxes and class labels, making it simpler and more efficient than conventional detectors like Faster R-CNN.
+
+### The Conditional DETR architecture
+<p align="center">
+  <img src="./readme-images/cond_detr_decoder.png" alt="Conditional DETR Architecture">
+</p>
+<p align="center"><b>Figure 2:</b> The decoder's architecture for Conditional DETR</p>
+
+Conditional DETR improves upon DETR by refining how object queries interact with image features. Instead of the fixed spatial attention mechanism used in DETR, Conditional DETR introduces **conditional cross-attention**, which makes object queries more location-aware. This allows the model to focus on relevant regions more effectively, leading to faster convergence and improved performance, especially for small objects. Additionally, by incorporating **modulated attention mechanisms**, Conditional DETR reduces redundancy in query updates, making it more efficient in training and inference.
+
 
 ### The training objective
 In order to train DETR, the authors of the [original paper](https://arxiv.org/abs/2005.12872) developed a comprenensive but relatively simple loss function to optimize the models parameters during training. The loss function is defined as:
@@ -63,6 +72,8 @@ This project was developed in order to make training, testing the DETR object de
 The [DETR notebook](./src/detr.ipynb) provides an end-to-end workfow for training, fine-tuning and evaluating a DETR model on an object detection task. The notebook makes use of the following components:
 -  [DETR model](./src/models/detr.py): The model architecture class implemented in PyTorch.
 
+- [Conditional DETR model](./src/models/cond_detr.py): The Conditional DETR model class implemented in PyTorch.
+
 - [PyTorchCOCODataLoader](./src/dataloaders/coco_od_pytorch.py): A simple yet efficient dataloader that can be used to easily prepare and load your object detection COCO dataset for training DETR.
 
 - [DETRBoxVisualizer](./src/utils/visualizers.py): Visualizer class that can be used to plot ground truth boxes over an image, detection results over an image or the inference results of a random batch from a testing test. Useful to verify performance/dataset preparation.
@@ -72,15 +83,15 @@ The [DETR notebook](./src/detr.ipynb) provides an end-to-end workfow for trainin
 - [DERTEvaluator](./src/models/evaluator.py): An evaluator class based on the COCO API. You can use this class along with a dataset loaded with the [PyTorchCOCODataLoader](./src/dataloaders/coco_od_pytorch.py) to evaluate the performance of your model using metrics such as **AP (Average Precision) or AR (Average Recall) across different IoU (Intersection-over-Union) thresholds**.
 
 
-## Case study: Fine-tuning and evaluating DETR on a small dataset
+## Case study: Fine-tuning and evaluating the DETR models on a small dataset
 To showcase and test that all the parts of this project were implemented correctly, I conducted a small case study. Using the [DETR notebook](./src/detr.ipynb), some pre-trained weights from a previous experiment and the [People HQ](https://universe.roboflow.com/myroboflowprojects/people_hq) dataset from [Roboflow](https://roboflow.com/) I have attempted to train DETR how to detect people.
 
 ## Training the model
 Transformers typically require a **significant amount of training time**, especially when trained from scratch. Therefore, it is highly recommended to fine-tune the model instead and start the training using pre-trained weights for all the heads.
 
-For this PoC case study, **I have used pre-trained weights from a previous training with the [COCO people dataset](https://universe.roboflow.com/shreks-swamp/coco-dataset-limited--person-only) and then finetuned the model over the much smaller dataset I annotated using [Roboflow](https://roboflow.com/), for another 100 epochs.** You can find the pre-trained weights and weights from this experiment [here](#pre-trained-weights-for-detr).
+For this PoC case study, **I have used pre-trained weights from a previous training with the [COCO people dataset](https://universe.roboflow.com/shreks-swamp/coco-dataset-limited--person-only) and then finetuned the models over the much smaller dataset I annotated using [Roboflow](https://roboflow.com/), for another ~100 epochs.** You can find the pre-trained weights and weights from this experiment [here](#pre-trained-weights-for-detr).
 
-The total loss (weight sum of the GIoU, L1 bounding box loss and classification loss) as well as the separate losses from training time can be seen below:
+For reference, the total loss (weight sum of the GIoU, L1 bounding box loss and classification loss) as well as the separate losses from training time for DETR can be seen below:
 
 <p align="center">
   <img src="./readme-images/DETR_training_loss.png" alt="DETR Loss">
@@ -94,19 +105,26 @@ The total loss (weight sum of the GIoU, L1 bounding box loss and classification 
 
 As we can observe there seems to be much more space for improvements, as probably training for more epochs could probably lead to much better performance. Nevertheless, performance **seems quite decent for this Proof-of-Concept(PoC) case study.**
 
-## Inference with DETR
-As we can see, despite the fact that the model was trained on a relatively small dataset with limited variance, it still demonstrates promising adaptability and meaningful detection capabilities:
+## Inference with DETR and ConditionalDETR
+As we can see, despite the fact that the models were trained on a relatively small dataset with limited variance, they still demonstrate promising adaptability and meaningful detection capabilities:
 
 <p align="center">
   <img src="./readme-images/inference.gif" alt="Predictions Demo">
 </p>
 <p align="center"><b>Figure 3:</b> Inference with the DETR model trained to detect people</p>
 
+<p align="center">
+  <img src="./readme-images/inference_cond_detr.gif" alt="Predictions Demo2">
+</p>
+<p align="center"><b>Figure 4:</b> Inference with the Conditional DETR model trained to detect people</p>
+
 ## Evaluation results
 The COCO API (see [pycocotools](https://pypi.org/project/pycocotools/)) offers various tools we can use to work with COCO-formatted datasets. One of the tools is a simple and effective evaluation suite which I have used to build an evaluator for our object detection model.
 
 
-After evaluating the model, trained on ~500 images I collected and annotated ([People HQ dataset](https://universe.roboflow.com/myroboflowprojects/people_hq)), using the customized [DETR Evaluator](./src/models/evaluator.py) we got the following performance metrics over the small unseen testing set:
+After evaluating the DETR models (DETR and ConditionalDETR), trained on ~500 images I collected and annotated ([People HQ dataset](https://universe.roboflow.com/myroboflowprojects/people_hq)), using the customized [DETR Evaluator](./src/models/evaluator.py) we got the following performance metrics over the small unseen testing set:
+
+### Evaluation with the trained DETR
 
 | Metric                   | Area    | Value  |
 |--------------------------|--------|--------|
@@ -123,30 +141,57 @@ After evaluating the model, trained on ~500 images I collected and annotated ([P
 | **Average Recall (AR)**    | medium | **0.190** |
 | **Average Recall (AR)**    | large  | **0.309** |
 
-### Analysis of Model Performance
+### Evaluation with the Conditional DETR
+| Metric                   | Area    | Value  |
+|--------------------------|--------|--------|
+| **Average Precision (AP)** | all    | **0.449** |
+| **Average Precision (AP)** | all (IoU=0.50) | **0.759** |
+| **Average Precision (AP)** | all (IoU=0.75) | **0.473** |
+| **Average Precision (AP)** | small  | **0.007** |
+| **Average Precision (AP)** | medium | **0.120** |
+| **Average Precision (AP)** | large  | **0.561** |
+| **Average Recall (AR)**    | all (maxDets=1)   | **0.140** |
+| **Average Recall (AR)**    | all (maxDets=10)  | **0.540** |
+| **Average Recall (AR)**    | all (maxDets=100) | **0.544** |
+| **Average Recall (AR)**    | small  | **0.031** |
+| **Average Recall (AR)**    | medium | **0.213** |
+| **Average Recall (AR)**    | large  | **0.646** |
+
+### Performance analysis for both models
+
+#### DETR
 The model performs moderately well, with an overall AP of ~0.29. It detects objects well at IoU=0.50 (AP=0.40) and does better with larger than medium sized objects. This however, is somewhat expected, as the dataset I annotated and used for this might not contain enough variance as I only used 430 images for training.
 
 Recall improves with more detections (AR=0.153 for maxDets=1, rising to ~0.190 for maxDets=100 for medium and ~0.309 for larger sized objects).
 
-## Train, fine-tune or evaluate your own DETR model for object detection
+#### Conditional DETR
+Conditional DETR **shows a notable improvement over DETR** in terms of both precision and recall. The overall AP of 0.449 suggests better localization and classification performance. 
+
+The increase in AP at IoU=0.50 (0.759) indicates improved object confidence. Larger objects still benefit the most, with an AP of 0.561, while small objects remain challenging (AP=0.007) (probably expected though due to the small size of the training set).
+
+Recall is also significantly better, with AR=0.140 for maxDets=1 and increasing to 0.544 for maxDets=100. This suggests that Conditional DETR is more effective at retrieving objects when multiple detections are allowed, particularly benefiting larger and medium-sized objects. The improvements indicate that Conditional DETR better handles object queries, leading to more accurate predictions.
+
+## Train, fine-tune or evaluate your own DETR models for object detection
 
 Training a DETR model for object detection is made as simple as possible with this project, using the [DETR notebook](./src/detr.ipynb) and any dataset under the [COCO format](https://docs.aws.amazon.com/rekognition/latest/customlabels-dg/md-coco-overview.html). As mentioned previously in the [Case study](#case-study-fine-tuning-and-evaluating-detr-on-a-small-dataset), you can either start a training from scratch or use whichever of the provided [pre-trained weights](#pre-trained-weights-for-detr) suits your task better.
 
 
 ### Pre-trained weights for DETR
-You can test the model's performance using any of the trained weights listed below or use these as a starting point to fine-tune a DETR model on your own dataset.
+You can test the model's performance using any of the trained weights listed below or use these as a starting point to fine-tune a DETR (or Conditional DETR) model on your own dataset.
 
 ### 🏆 Model Checkpoints
 You can use any of the weights listed below depending on the task you want to solve. 
 
 **NOTE**: Only the COCO weights were trained from scratch, the rest of the checkpoints come from models fine-tuned on the COCO weights.
 
-| 🗂 **Dataset** | 🔁 **Epochs(T+F)** | 📂 **Weights** |
-|--------------|-------------|----------------|
-| [COCO](https://cocodataset.org/#home) | **150** | [⬇ coco_detr_150.pt](https://drive.google.com/file/d/15mHkKghGy8fltpz2Wqcw137imzSiVFGh/view?usp=drive_link) |
-| [Chess Pieces HQ](https://universe.roboflow.com/myroboflowprojects/chess-pieces-hq) | **250** | [⬇ chess_pieces_100.pt](https://drive.google.com/file/d/1BpB9cXBm2EIvHfKSbe5NCSAgzloPCY7r/view?usp=drive_link) |
-| [COCO-People only](https://universe.roboflow.com/shreks-swamp/coco-dataset-limited--person-only) | **195** | [⬇ coco_people_45.pt](https://drive.google.com/file/d/1GFkyJBzaOH0hJRi3XEE-dD61phjwP2oW/view?usp=drive_link) |
-| [People HQ](https://universe.roboflow.com/myroboflowprojects/people_hq) | **250** | [⬇ detr_people_hq.pt](https://drive.google.com/file/d/1usqAao4mYu_lkIApmVuqx-sbsL4lqLod/view?usp=drive_link) |
+| 🏷 **Model** | 🗂 **Dataset** | 🔁 **Epochs(T+F)** | 📂 **Weights** |
+|--------------|--------------|-------------|----------------|
+| **DETR** | [COCO](https://cocodataset.org/#home) | **150** | [⬇ coco_detr_150.pt](https://drive.google.com/file/d/15mHkKghGy8fltpz2Wqcw137imzSiVFGh/view?usp=drive_link) |
+| **DETR** | [Chess Pieces HQ](https://universe.roboflow.com/myroboflowprojects/chess-pieces-hq) | **250** | [⬇ chess_pieces_100.pt](https://drive.google.com/file/d/1BpB9cXBm2EIvHfKSbe5NCSAgzloPCY7r/view?usp=drive_link) |
+| **DETR** | [COCO-People only](https://universe.roboflow.com/shreks-swamp/coco-dataset-limited--person-only) | **195** | [⬇ coco_people_45.pt](https://drive.google.com/file/d/1GFkyJBzaOH0hJRi3XEE-dD61phjwP2oW/view?usp=drive_link) |
+| **DETR** | [People HQ](https://universe.roboflow.com/myroboflowprojects/people_hq) | **250** | [⬇ detr_people_hq.pt](https://drive.google.com/file/d/1usqAao4mYu_lkIApmVuqx-sbsL4lqLod/view?usp=drive_link) |
+| **Conditional DETR** | [People HQ](https://universe.roboflow.com/myroboflowprojects/people_hq) | **120** | [⬇ cond_detr_people_hq.pt](https://drive.google.com/file/d/1iNFs2S39iE43EcE6YGd0F701U9hXjGGu/view?usp=drive_link) |
+
 
 As you will see [here](#create-a-pytorch-dataloader-and-parse-your-dataset), you can load the dataset-specific information (e.g. "empty" box class ID, class names etc.) for all the dataset's listed above. You can look for the available keys as:
 ```
@@ -293,6 +338,8 @@ stats = evaluator.evaluate()
 
 ## References
 
-- [Original Paper: End-to-end Object Detection with Transformers](https://arxiv.org/abs/2005.12872): The original DETR paper from Meta AI
+- [Original Paper: End-to-end Object Detection with Transformers](https://arxiv.org/abs/2005.12872): The original DETR paper from Meta AI.
 
 - [Understanding and coding DETR by Rafael Toledo](https://medium.com/@rafaeltol/understanding-and-coding-detr-detection-transfomer-80e4c206fbc8): The Medium article used as inspiration for this work.
+
+- [Conditional DETR for Fast Training Convergence](https://arxiv.org/abs/2108.06152): The original Conditional DETR paper with the learnable anchor embeddings in the decoder.
