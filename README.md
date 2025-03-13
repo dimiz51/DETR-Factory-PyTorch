@@ -106,7 +106,7 @@ For reference, the total loss (weight sum of the GIoU, L1 bounding box loss and 
 As we can observe there seems to be much more space for improvements, as probably training for more epochs could probably lead to much better performance. Nevertheless, performance **seems quite decent for this Proof-of-Concept(PoC) case study.**
 
 ## Inference with DETR and ConditionalDETR
-As we can see, despite the fact that the models were trained on a relatively small dataset with limited variance, it still demonstrates promising adaptability and meaningful detection capabilities:
+As we can see, despite the fact that the models were trained on a relatively small dataset with limited variance, they still demonstrate promising adaptability and meaningful detection capabilities:
 
 <p align="center">
   <img src="./readme-images/inference.gif" alt="Predictions Demo">
