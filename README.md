@@ -1,4 +1,4 @@
-# Building and training the DETR (Detection Transformer) model with PyTorch
+# Building and training the DETR (Detection Transformer) models with PyTorch
 This project is an implementation of the Detection Transformer(DETR) and the Conditional DETR(CondDETR) variant, for state-of-the-art object detection using the well-known Transformer architecture. 
 
 This project makes training, fine-tuning and evaluation of the DETR models simple and straightforward on your own dataset. 
