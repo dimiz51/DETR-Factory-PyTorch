@@ -187,7 +187,6 @@ You can use any of the weights listed below depending on the task you want to so
 | 🏷 **Model** | 🗂 **Dataset** | 🔁 **Epochs(T+F)** | 📂 **Weights** |
 |--------------|--------------|-------------|----------------|
 | **DETR** | [COCO](https://cocodataset.org/#home) | **150** | [⬇ coco_detr_150.pt](https://drive.google.com/file/d/15mHkKghGy8fltpz2Wqcw137imzSiVFGh/view?usp=drive_link) |
-| **DETR** | [Chess Pieces HQ](https://universe.roboflow.com/myroboflowprojects/chess-pieces-hq) | **250** | [⬇ chess_pieces_100.pt](https://drive.google.com/file/d/1BpB9cXBm2EIvHfKSbe5NCSAgzloPCY7r/view?usp=drive_link) |
 | **DETR** | [COCO-People only](https://universe.roboflow.com/shreks-swamp/coco-dataset-limited--person-only) | **195** | [⬇ coco_people_45.pt](https://drive.google.com/file/d/1GFkyJBzaOH0hJRi3XEE-dD61phjwP2oW/view?usp=drive_link) |
 | **DETR** | [People HQ](https://universe.roboflow.com/myroboflowprojects/people_hq) | **250** | [⬇ detr_people_hq.pt](https://drive.google.com/file/d/1usqAao4mYu_lkIApmVuqx-sbsL4lqLod/view?usp=drive_link) |
 | **Conditional DETR** | [People HQ](https://universe.roboflow.com/myroboflowprojects/people_hq) | **120** | [⬇ cond_detr_people_hq.pt](https://drive.google.com/file/d/1iNFs2S39iE43EcE6YGd0F701U9hXjGGu/view?usp=drive_link) |
